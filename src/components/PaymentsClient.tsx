@@ -12,6 +12,7 @@ type PaymentRow = {
   amount: number;
   note: string | null;
   paidAt: string;
+  status?: string;
   player: { name: string; seat: string };
 };
 
@@ -24,6 +25,7 @@ type SummaryRow = {
   overpaid?: number;
   isInstalment: boolean;
   isPaid?: boolean;
+  claim?: { id: string; amount: number; type: string } | null;
 };
 
 type WalkIn = {
@@ -52,12 +54,15 @@ export function PaymentsClient() {
       .catch(() => setError("Could not load payments"));
   }, []);
 
+  const confirmedLog = payments.filter((p) => p.status !== "claimed");
+
   return (
     <AppChrome title="Payments">
       <p className="text-muted">
-        Cycle: <span className="text-chalk">{PAYMENT_CYCLE.label}</span>. Pay,
-        then send proof with your name on WhatsApp. Admin marks you paid (or
-        regular) after that.
+        Who owes what and who&apos;s paid for{" "}
+        <span className="text-chalk">{PAYMENT_CYCLE.label}</span>. Send proof on
+        WhatsApp, then mark <span className="text-chalk">I&apos;ve paid</span>{" "}
+        on your dashboard so admin can confirm.
       </p>
 
       <PaymentProofBox className="mt-6" />
@@ -96,6 +101,10 @@ export function PaymentsClient() {
                     </Link>
                     {row.isPaid ? (
                       <span className="ml-2 text-xs text-flood">paid</span>
+                    ) : row.claim ? (
+                      <span className="ml-2 text-xs text-flood-soft">
+                        awaiting confirmation
+                      </span>
                     ) : row.isInstalment ? (
                       <span className="ml-2 text-xs text-flood">partial</span>
                     ) : (
@@ -159,14 +168,14 @@ export function PaymentsClient() {
             </tr>
           </thead>
           <tbody>
-            {payments.length === 0 ? (
+            {confirmedLog.length === 0 ? (
               <tr>
                 <td colSpan={5} className="px-4 py-8 text-muted">
                   Empty until you mark payments in Admin.
                 </td>
               </tr>
             ) : (
-              payments.map((p) => (
+              confirmedLog.map((p) => (
                 <tr key={p.id} className="border-b border-line">
                   <td className="px-4 py-3 font-semibold text-chalk">
                     {p.player.name}

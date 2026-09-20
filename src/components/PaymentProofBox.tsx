@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { PAYMENT_ACCOUNT, WHATSAPP } from "@/lib/league-db";
 
-/** Shared pay + proof-of-payment instructions. */
+/** Shared bank + WhatsApp proof instructions (Payments / Me — not Purse). */
 export function PaymentProofBox({ className = "" }: { className?: string }) {
   return (
     <div
@@ -18,8 +18,12 @@ export function PaymentProofBox({ className = "" }: { className?: string }) {
       </p>
       <p className="mt-4 text-sm text-chalk">
         After you transfer, send{" "}
-        <strong className="text-flood">proof of payment with your full name</strong>{" "}
-        to the WhatsApp group or to Aji on WhatsApp.
+        <strong className="text-flood">
+          proof of payment with your full name
+        </strong>{" "}
+        to the WhatsApp group or to Aji on WhatsApp — then tap{" "}
+        <strong className="text-flood">I&apos;ve paid</strong> on your dashboard
+        so we can confirm it.
       </p>
       <ul className="mt-3 space-y-2 text-sm">
         <li>
@@ -44,11 +48,15 @@ export function PaymentProofBox({ className = "" }: { className?: string }) {
         </li>
       </ul>
       <p className="mt-3 text-xs text-muted">
-        Admin can mark you as a regular before payment clears — still send proof
-        so the purse stays accurate.{" "}
+        Status updates on{" "}
+        <Link href="/me" className="text-flood hover:underline">
+          your dashboard
+        </Link>{" "}
+        and the{" "}
         <Link href="/payments" className="text-flood hover:underline">
-          Payments board
+          payments board
         </Link>
+        .
       </p>
     </div>
   );

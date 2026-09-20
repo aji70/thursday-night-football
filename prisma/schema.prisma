@@ -19,21 +19,23 @@ model Team {
 }
 
 model Player {
-  id           String       @id @default(cuid())
-  name         String
-  phone        String       @unique
-  passwordHash String
-  status       String       @default("pending") // pending | active
-  seat         String       @default("sub") // permanent | sub
-  isAdmin      Boolean      @default(false)
-  photoPath    String?
-  teamId       String?
-  team         Team?        @relation(fields: [teamId], references: [id])
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
-  payments     Payment[]
-  events       MatchEvent[]
-  feedback     Feedback[]
+  id                          String       @id @default(cuid())
+  name                        String
+  phone                       String       @unique
+  passwordHash                String
+  status                      String       @default("pending") // pending | active
+  seat                        String       @default("sub") // permanent | sub
+  isAdmin                     Boolean      @default(false)
+  photoPath                   String?
+  suspensionMatchesRemaining  Int          @default(0)
+  suspensionReason            String?
+  teamId                      String?
+  team                        Team?        @relation(fields: [teamId], references: [id])
+  createdAt                   DateTime     @default(now())
+  updatedAt                   DateTime     @updatedAt
+  payments                    Payment[]
+  events                      MatchEvent[]
+  feedback                    Feedback[]
 
   @@index([name])
   @@index([status])
@@ -47,11 +49,14 @@ model Payment {
   type      String // MONTHLY_5K | MONTHLY_INSTALMENT | VISITOR_1_5K
   amount    Int
   note      String?
+  /** confirmed = admin-verified (counts in purse); claimed = player submitted, awaiting confirmation */
+  status    String   @default("confirmed") // claimed | confirmed
   paidAt    DateTime @default(now())
   createdAt DateTime @default(now())
 
   @@index([monthKey])
   @@index([playerId])
+  @@index([status])
 }
 
 /** Cash / on-field payments from people not yet registered. */

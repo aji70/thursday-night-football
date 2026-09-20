@@ -4,6 +4,11 @@ import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AppChrome } from "@/components/AppChrome";
+import { WHATSAPP } from "@/lib/league-db";
+
+const forgotPasswordUrl = `${WHATSAPP.adminChatUrl}?text=${encodeURIComponent(
+  "Hi Aji — I forgot my Thursday Night Football password. My name is ",
+)}`;
 
 export function LoginForm() {
   const router = useRouter();
@@ -67,8 +72,23 @@ export function LoginForm() {
         </button>
         {error ? <p className="text-danger">{error}</p> : null}
         <p className="text-sm text-muted">
+          Forgot password?{" "}
+          <a
+            href={forgotPasswordUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-flood underline-offset-2 hover:underline"
+          >
+            WhatsApp Aji
+          </a>{" "}
+          with your name and phone — he&apos;ll reset it.
+        </p>
+        <p className="text-sm text-muted">
           New here?{" "}
-          <Link href="/register" className="text-flood underline-offset-2 hover:underline">
+          <Link
+            href="/register"
+            className="text-flood underline-offset-2 hover:underline"
+          >
             Create a profile
           </Link>
         </p>

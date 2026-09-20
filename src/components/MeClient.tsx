@@ -5,9 +5,13 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AppChrome, formatNaira } from "@/components/AppChrome";
 import { PaymentProofBox } from "@/components/PaymentProofBox";
+import { PAYMENT_CYCLE } from "@/lib/league-db";
 
 type Dashboard = {
   monthKey: string;
+  cycleLabel: string;
+  pendingProfile: boolean;
+  awaitingRoster: boolean;
   player: {
     id: string;
     name: string;
@@ -18,12 +22,32 @@ type Dashboard = {
     isAdmin?: boolean;
     team: { name: string; number: number } | null;
   };
+  nextMatch: {
+    week: number;
+    match: number;
+    dateLabel: string;
+    time: string;
+    fixture: string;
+    opponentLabel: string;
+    officiating: string;
+  } | null;
   payment: {
     paidThisMonth: boolean;
     permanentPaid: boolean;
-    paidTotal?: number;
-    remaining?: number;
+    paidTotal: number;
+    remaining: number;
+    seat: string;
+    claim: {
+      id: string;
+      amount: number;
+      type: string;
+      paidAt: string;
+    } | null;
     payments: { type: string; amount: number; paidAt: string }[];
+  };
+  suspension: {
+    matchesRemaining: number;
+    reason: string | null;
   };
   stats: {
     goals: number;
@@ -46,19 +70,24 @@ export function MeClient() {
   const [data, setData] = useState<Dashboard | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  function load() {
     fetch("/api/me")
       .then(async (r) => {
         if (r.status === 401) {
-          router.replace("/login");
+          router.push("/login");
           return null;
         }
+        if (!r.ok) throw new Error("Failed");
         return r.json();
       })
-      .then((payload) => {
-        if (payload) setData(payload);
+      .then((d) => {
+        if (d) setData(d);
       })
-      .catch(() => setError("Could not load your profile"));
+      .catch(() => setError("Could not load dashboard"));
+  }
+
+  useEffect(() => {
+    load();
   }, [router]);
 
   async function logout() {
@@ -67,14 +96,26 @@ export function MeClient() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "logout" }),
     });
-    router.push("/login");
+    router.push("/");
+    router.refresh();
   }
 
+  const prefAmount =
+    data?.player.seat === "permanent"
+      ? PAYMENT_CYCLE.monthlyFee
+      : PAYMENT_CYCLE.visitorFee;
+  const prefType =
+    data?.player.seat === "permanent" ? "MONTHLY_5K" : "VISITOR_1_5K";
+
   return (
-    <AppChrome title="My profile">
+    <AppChrome title="My dashboard">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="max-w-xl text-muted">
-          Your team, payment status, and monthly record.
+          Cycle{" "}
+          <span className="text-chalk">
+            {data?.cycleLabel ?? PAYMENT_CYCLE.label}
+          </span>
+          . Team, next match, stats, and payment status.
         </p>
         <button
           type="button"
@@ -86,14 +127,22 @@ export function MeClient() {
       </div>
 
       {error ? <p className="mt-6 text-danger">{error}</p> : null}
-      {!data && !error ? <p className="mt-6 text-muted">Loading…</p> : null}
+      {!data && !error ? <p className="mt-8 text-muted">Loading…</p> : null}
 
       {data ? (
         <div className="mt-8 space-y-10">
-          {data.player.status === "pending" ? (
+          {data.pendingProfile ? (
             <p className="border border-flood/40 bg-black/20 px-4 py-3 text-flood-soft">
-              Profile pending admin verification. You can view this page, but
-              you are not active in the league until approved.
+              Profile pending admin verification. You can upload a photo and
+              claim a payment, but you are not active in the league until
+              approved.
+            </p>
+          ) : null}
+
+          {data.awaitingRoster ? (
+            <p className="border border-line px-4 py-3 text-muted">
+              You are active but not drafted yet. Team and next match appear
+              after Matchday 1 balancing / admin assignment.
             </p>
           ) : null}
 
@@ -124,13 +173,18 @@ export function MeClient() {
                   body: fd,
                 });
                 if (res.ok) {
-                  const player = await res.json();
-                  setData({ ...data, player: { ...data.player, ...player } });
+                  load();
                   form.reset();
                 }
               }}
             >
-              <input type="file" name="photo" accept="image/*" required className="text-sm text-muted" />
+              <input
+                type="file"
+                name="photo"
+                accept="image/*"
+                required
+                className="text-sm text-muted"
+              />
               <button
                 type="submit"
                 className="bg-flood px-3 py-2 text-xs font-semibold uppercase tracking-[0.08em] text-pitch-deep"
@@ -148,47 +202,144 @@ export function MeClient() {
 
           <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <InfoCard label="Name" value={data.player.name} />
-            <InfoCard label="Phone" value={data.player.phone} />
             <InfoCard
               label="Team"
-              value={data.player.team?.name ?? "Not assigned yet"}
+              value={
+                data.player.team
+                  ? `${data.player.team.name} (#${data.player.team.number})`
+                  : data.awaitingRoster
+                    ? "Awaiting draft"
+                    : "Not assigned"
+              }
             />
             <InfoCard
               label="Seat"
-              value={`${data.player.seat} · ${data.player.status}`}
+              value={
+                data.player.seat === "permanent" ? "Regular" : "Visitor / sub"
+              }
+            />
+            <InfoCard
+              label="Suspension"
+              value={
+                data.suspension.matchesRemaining > 0
+                  ? `${data.suspension.matchesRemaining}-match ban remaining${
+                      data.suspension.reason
+                        ? ` — ${data.suspension.reason}`
+                        : ""
+                    }`
+                  : "Clear"
+              }
             />
           </section>
 
           <section>
-            <h2 className="font-display text-2xl text-chalk">
-              Payment · {data.monthKey}
-            </h2>
-            {data.player.isAdmin ? (
-              <p className="mt-2 text-muted">
-                You can mark yourself paid in Admin. Your row stays off the
-                public payments board.
+            <h2 className="font-display text-2xl text-chalk">Next match</h2>
+            {data.pendingProfile || data.awaitingRoster ? (
+              <p className="mt-3 text-muted">
+                Available once you are verified and assigned to a team.
               </p>
+            ) : data.nextMatch ? (
+              <div className="mt-4 border border-line px-4 py-5">
+                <p className="text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-flood">
+                  Week {data.nextMatch.week} · Match {data.nextMatch.match}
+                </p>
+                <p className="mt-2 font-display text-2xl text-chalk">
+                  vs {data.nextMatch.opponentLabel}
+                </p>
+                <p className="mt-2 text-muted">
+                  {data.nextMatch.dateLabel} · {data.nextMatch.time}
+                </p>
+                <p className="mt-1 text-sm text-muted">
+                  {data.nextMatch.fixture} · Panel: {data.nextMatch.officiating}
+                </p>
+              </div>
             ) : (
-              <p className="mt-2 text-muted">
-                {data.payment.paidThisMonth
-                  ? data.payment.permanentPaid
-                    ? `Paid in full (${formatNaira(data.payment.paidTotal ?? 5000)}) — regular seat.`
-                    : `Partial: ${formatNaira(data.payment.paidTotal ?? 0)} paid${
-                        data.payment.remaining
-                          ? ` · ${formatNaira(data.payment.remaining)} remaining`
-                          : ""
-                      }.`
-                  : data.player.seat === "permanent"
-                    ? "Marked as regular — still send proof of payment on WhatsApp so admin can log it."
-                    : "No payment logged yet. Pay, then send proof with your name on WhatsApp."}
+              <p className="mt-3 text-muted">
+                No upcoming fixtures left in this cycle for your team.
               </p>
             )}
-            {!data.payment.paidThisMonth && !data.player.isAdmin ? (
-              <PaymentProofBox className="mt-4" />
+          </section>
+
+          <section>
+            <h2 className="font-display text-2xl text-chalk">
+              Stats · {data.cycleLabel}
+            </h2>
+            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
+              <Stat label="Goals" value={data.stats.goals} />
+              <Stat label="Assists" value={data.stats.assists} />
+              <Stat label="YC" value={data.stats.yc} />
+              <Stat label="RC" value={data.stats.rc} />
+              <Stat label="Overall" value={data.stats.overall} />
+            </div>
+          </section>
+
+          <section>
+            <h2 className="font-display text-2xl text-chalk">Payment</h2>
+            {data.payment.claim ? (
+              <div className="mt-3 border border-flood/40 bg-black/20 px-4 py-4">
+                <p className="text-flood-soft">
+                  Payment submitted — awaiting admin confirmation (
+                  {formatNaira(data.payment.claim.amount)}).
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <ClaimEditForm
+                    claim={data.payment.claim}
+                    defaultType={prefType}
+                    onDone={load}
+                  />
+                  <button
+                    type="button"
+                    className="text-sm text-danger"
+                    onClick={async () => {
+                      await fetch(
+                        `/api/payments?id=${data.payment.claim!.id}`,
+                        { method: "DELETE" },
+                      );
+                      load();
+                    }}
+                  >
+                    Cancel claim
+                  </button>
+                </div>
+              </div>
+            ) : data.payment.permanentPaid ? (
+              <p className="mt-3 text-muted">
+                Paid in full ({formatNaira(data.payment.paidTotal)}) — regular
+                seat.
+              </p>
+            ) : data.payment.paidThisMonth ? (
+              <p className="mt-3 text-muted">
+                Partial: {formatNaira(data.payment.paidTotal)} paid
+                {data.payment.remaining
+                  ? ` · ${formatNaira(data.payment.remaining)} remaining`
+                  : ""}
+                .
+              </p>
+            ) : (
+              <p className="mt-3 text-muted">
+                No confirmed payment yet
+                {data.player.seat === "permanent"
+                  ? " (marked regular — still send proof)."
+                  : "."}
+              </p>
+            )}
+
+            {!data.player.isAdmin &&
+            !data.payment.permanentPaid &&
+            !data.payment.claim ? (
+              <div className="mt-4 space-y-4">
+                <PaymentProofBox />
+                <ClaimForm
+                  defaultAmount={prefAmount}
+                  defaultType={prefType}
+                  onDone={load}
+                />
+              </div>
             ) : null}
+
             <ul className="mt-4 border-t border-line">
               {data.payment.payments.length === 0 ? (
-                <li className="py-4 text-muted">Nothing recorded.</li>
+                <li className="py-4 text-muted">No confirmed payments yet.</li>
               ) : (
                 data.payment.payments.map((p, i) => (
                   <li
@@ -212,43 +363,14 @@ export function MeClient() {
             </ul>
           </section>
 
-          <section>
-            <h2 className="font-display text-2xl text-chalk">
-              Monthly stats · {data.monthKey}
-            </h2>
-            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
-              <Stat label="Goals" value={data.stats.goals} />
-              <Stat label="Assists" value={data.stats.assists} />
-              <Stat label="YC" value={data.stats.yc} />
-              <Stat label="RC" value={data.stats.rc} />
-              <Stat label="Overall" value={data.stats.overall} />
-            </div>
-            <ul className="mt-6 border-t border-line">
-              {data.events.length === 0 ? (
-                <li className="py-4 text-muted">No match events yet.</li>
-              ) : (
-                data.events.map((ev) => (
-                  <li
-                    key={ev.id}
-                    className="border-b border-line py-2 text-sm text-muted"
-                  >
-                    Week {ev.week} · Match {ev.match} · {ev.type} ×{ev.count}
-                  </li>
-                ))
-              )}
-            </ul>
-          </section>
-
           <p className="text-sm text-muted">
-            Browse everyone on{" "}
-            <Link href="/players" className="text-flood hover:underline">
-              Players
-            </Link>{" "}
-            or the full{" "}
+            <Link href="/payments" className="text-flood hover:underline">
+              Payments board
+            </Link>
+            {" · "}
             <Link href="/tables" className="text-flood hover:underline">
               Tables
             </Link>
-            .
           </p>
         </div>
       ) : null}
@@ -256,13 +378,143 @@ export function MeClient() {
   );
 }
 
+function ClaimForm({
+  defaultAmount,
+  defaultType,
+  onDone,
+}: {
+  defaultAmount: number;
+  defaultType: string;
+  onDone: () => void;
+}) {
+  const [amount, setAmount] = useState(String(defaultAmount));
+  const [type, setType] = useState(defaultType);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  return (
+    <form
+      className="grid max-w-lg gap-3 sm:grid-cols-[auto_7rem_auto]"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        setBusy(true);
+        setErr(null);
+        const res = await fetch("/api/payments", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "claim",
+            type,
+            amount: Number(amount),
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        setBusy(false);
+        if (!res.ok) {
+          setErr(data.error || "Could not submit");
+          return;
+        }
+        onDone();
+      }}
+    >
+      <select
+        className="select-field border border-line bg-pitch-lift px-3 py-2 text-sm text-chalk"
+        value={type}
+        onChange={(e) => {
+          setType(e.target.value);
+          if (e.target.value === "MONTHLY_5K")
+            setAmount(String(PAYMENT_CYCLE.monthlyFee));
+          if (e.target.value === "VISITOR_1_5K")
+            setAmount(String(PAYMENT_CYCLE.visitorFee));
+          if (e.target.value === "MONTHLY_INSTALMENT") setAmount("3000");
+        }}
+      >
+        <option value="MONTHLY_5K">Full monthly</option>
+        <option value="MONTHLY_INSTALMENT">Instalment / partial</option>
+        <option value="VISITOR_1_5K">Visitor</option>
+      </select>
+      <input
+        type="number"
+        min={1}
+        value={amount}
+        onChange={(e) => setAmount(e.target.value)}
+        className="select-field border border-line bg-pitch-lift px-3 py-2 text-sm text-chalk"
+        required
+      />
+      <button
+        type="submit"
+        disabled={busy}
+        className="bg-flood px-4 py-2 text-sm font-semibold text-pitch-deep disabled:opacity-60"
+      >
+        {busy ? "Sending…" : "I've paid"}
+      </button>
+      {err ? <p className="sm:col-span-3 text-sm text-danger">{err}</p> : null}
+    </form>
+  );
+}
+
+function ClaimEditForm({
+  claim,
+  defaultType,
+  onDone,
+}: {
+  claim: { id: string; amount: number; type: string };
+  defaultType: string;
+  onDone: () => void;
+}) {
+  const [amount, setAmount] = useState(String(claim.amount));
+  const [type, setType] = useState(claim.type || defaultType);
+
+  return (
+    <form
+      className="flex flex-wrap gap-2"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        await fetch("/api/payments", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: claim.id,
+            amount: Number(amount),
+            type,
+          }),
+        });
+        onDone();
+      }}
+    >
+      <select
+        className="select-field border border-line bg-pitch-lift px-2 py-1.5 text-xs text-chalk"
+        value={type}
+        onChange={(e) => setType(e.target.value)}
+      >
+        <option value="MONTHLY_5K">Full monthly</option>
+        <option value="MONTHLY_INSTALMENT">Instalment</option>
+        <option value="VISITOR_1_5K">Visitor</option>
+      </select>
+      <input
+        type="number"
+        min={1}
+        value={amount}
+        onChange={(e) => setAmount(e.target.value)}
+        className="select-field w-24 border border-line bg-pitch-lift px-2 py-1.5 text-xs text-chalk"
+      />
+      <button
+        type="submit"
+        className="border border-line px-3 py-1.5 text-xs text-muted"
+      >
+        Update claim
+      </button>
+    </form>
+  );
+}
+
 function InfoCard({ label, value }: { label: string; value: string }) {
   return (
     <div className="border border-line px-4 py-4">
-      <p className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-muted">
+      <p className="text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-muted">
         {label}
       </p>
-      <p className="mt-2 font-semibold capitalize text-chalk">{value}</p>
+      <p className="mt-1 font-semibold text-chalk">{value}</p>
     </div>
   );
 }
@@ -273,7 +525,7 @@ function Stat({ label, value }: { label: string; value: number }) {
       <p className="text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-muted">
         {label}
       </p>
-      <p className="font-display mt-1 text-2xl text-flood">{value}</p>
+      <p className="mt-1 font-display text-2xl text-flood">{value}</p>
     </div>
   );
 }

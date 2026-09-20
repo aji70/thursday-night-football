@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AppChrome, formatNaira } from "@/components/AppChrome";
-import { PaymentProofBox } from "@/components/PaymentProofBox";
-import { PAYMENT_CYCLE } from "@/lib/league-db";
+import { PAYMENT_ACCOUNT, PAYMENT_CYCLE } from "@/lib/league-db";
 
 type Expense = {
   id: string;
@@ -47,10 +46,18 @@ export function PurseClient() {
   return (
     <AppChrome title="Squad purse">
       <p className="max-w-xl text-muted">
-        Cycle {PAYMENT_CYCLE.label}. Fees + carryover − spending.
+        The squad&apos;s money for{" "}
+        <span className="text-chalk">{PAYMENT_CYCLE.label}</span> — confirmed
+        fees + carryover − spending. For who owes what, see{" "}
+        <a href="/payments" className="text-flood hover:underline">
+          Payments
+        </a>
+        .
       </p>
-
-      <PaymentProofBox className="mt-6 max-w-xl" />
+      <p className="mt-3 max-w-xl text-sm text-muted">
+        Bank: {PAYMENT_ACCOUNT.accountNumber} ({PAYMENT_ACCOUNT.bank}) ·{" "}
+        {PAYMENT_ACCOUNT.accountName}
+      </p>
 
       {error ? <p className="mt-6 text-danger">{error}</p> : null}
 

@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/auth";
+import {
+  getPlayerIdFromSession,
+  requireAdmin,
+  requirePlayer,
+} from "@/lib/auth";
 import {
   PAYMENT_AMOUNTS,
   PAYMENT_CYCLE,
@@ -7,6 +11,50 @@ import {
   type PaymentType,
 } from "@/lib/league-db";
 import { prisma } from "@/lib/prisma";
+
+async function syncSeatForPlayer(playerId: string, monthKey: string) {
+  const total = await prisma.payment.aggregate({
+    where: {
+      playerId,
+      monthKey,
+      status: "confirmed",
+      type: { in: ["MONTHLY_5K", "MONTHLY_INSTALMENT", "VISITOR_1_5K"] },
+    },
+    _sum: { amount: true },
+  });
+  const sum = total._sum.amount || 0;
+  const visitorOnly = await prisma.payment.count({
+    where: {
+      playerId,
+      monthKey,
+      status: "confirmed",
+      type: "VISITOR_1_5K",
+    },
+  });
+  const monthly = await prisma.payment.count({
+    where: {
+      playerId,
+      monthKey,
+      status: "confirmed",
+      type: { in: ["MONTHLY_5K", "MONTHLY_INSTALMENT"] },
+    },
+  });
+
+  let seat: "permanent" | "sub" = "sub";
+  if (monthly > 0 && sum >= PAYMENT_CYCLE.monthlyFee) seat = "permanent";
+  else if (monthly > 0 && sum > 0 && sum < PAYMENT_CYCLE.monthlyFee) {
+    const player = await prisma.player.findUnique({
+      where: { id: playerId },
+      select: { seat: true },
+    });
+    seat = player?.seat === "permanent" ? "permanent" : "sub";
+  } else if (visitorOnly > 0 && monthly === 0) seat = "sub";
+
+  await prisma.player.update({
+    where: { id: playerId },
+    data: { seat },
+  });
+}
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -38,13 +86,22 @@ export async function GET(request: Request) {
     }),
   ]);
 
-  const totals = new Map<string, number>();
+  const confirmedTotals = new Map<string, number>();
+  const claimedByPlayer = new Map<string, (typeof payments)[0]>();
   for (const p of payments) {
-    totals.set(p.playerId, (totals.get(p.playerId) || 0) + p.amount);
+    if (p.status === "confirmed") {
+      confirmedTotals.set(
+        p.playerId,
+        (confirmedTotals.get(p.playerId) || 0) + p.amount,
+      );
+    } else if (p.status === "claimed") {
+      claimedByPlayer.set(p.playerId, p);
+    }
   }
 
   const summary = players.map((player) => {
-    const total = totals.get(player.id) || 0;
+    const total = confirmedTotals.get(player.id) || 0;
+    const claim = claimedByPlayer.get(player.id);
     return {
       playerId: player.id,
       name: player.name,
@@ -54,12 +111,20 @@ export async function GET(request: Request) {
       overpaid: Math.max(0, total - PAYMENT_CYCLE.monthlyFee),
       isInstalment: total > 0 && total < PAYMENT_CYCLE.monthlyFee,
       isPaid: total >= PAYMENT_CYCLE.monthlyFee,
+      claim: claim
+        ? {
+            id: claim.id,
+            amount: claim.amount,
+            type: claim.type,
+            paidAt: claim.paidAt,
+          }
+        : null,
     };
   });
 
-  // Paid first, then partial, then unpaid — so already-paid players are visible.
   summary.sort((a, b) => {
     if (a.isPaid !== b.isPaid) return a.isPaid ? -1 : 1;
+    if (!!a.claim !== !!b.claim) return a.claim ? -1 : 1;
     if (a.isInstalment !== b.isInstalment) return a.isInstalment ? -1 : 1;
     return a.name.localeCompare(b.name);
   });
@@ -73,19 +138,120 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  try {
-    await requireAdmin();
-  } catch {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   const body = (await request.json()) as {
+    action?: string;
     playerId?: string;
     type?: PaymentType;
     amount?: number;
     monthKey?: string;
     note?: string;
+    id?: string;
   };
+
+  // Player claims "I've paid"
+  if (body.action === "claim") {
+    let playerId: string;
+    try {
+      playerId = await requirePlayer();
+    } catch {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const type = body.type;
+    if (!type || !(type in PAYMENT_AMOUNTS)) {
+      return NextResponse.json({ error: "Valid type required" }, { status: 400 });
+    }
+
+    const amount = Math.round(Number(body.amount) || 0);
+    if (!amount || amount <= 0) {
+      return NextResponse.json(
+        { error: "Positive amount required" },
+        { status: 400 },
+      );
+    }
+
+    const monthKey = body.monthKey || PAYMENT_CYCLE.key;
+    const existingClaim = await prisma.payment.findFirst({
+      where: { playerId, monthKey, status: "claimed" },
+    });
+    if (existingClaim) {
+      return NextResponse.json(
+        {
+          error:
+            "You already have a pending claim. Cancel or edit it before submitting another.",
+        },
+        { status: 409 },
+      );
+    }
+
+    const payment = await prisma.payment.create({
+      data: {
+        playerId,
+        monthKey,
+        type,
+        amount,
+        status: "claimed",
+        note:
+          body.note?.trim() ||
+          "Player claimed — awaiting admin confirmation",
+      },
+    });
+
+    return NextResponse.json(payment, { status: 201 });
+  }
+
+  // Admin confirm claim
+  if (body.action === "confirm") {
+    try {
+      await requireAdmin();
+    } catch {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    if (!body.id) {
+      return NextResponse.json({ error: "id required" }, { status: 400 });
+    }
+    const existing = await prisma.payment.findUnique({ where: { id: body.id } });
+    if (!existing || existing.status !== "claimed") {
+      return NextResponse.json({ error: "Claim not found" }, { status: 404 });
+    }
+    const payment = await prisma.payment.update({
+      where: { id: body.id },
+      data: {
+        status: "confirmed",
+        note: existing.note?.includes("awaiting")
+          ? "Confirmed by admin"
+          : existing.note,
+        paidAt: new Date(),
+      },
+    });
+    await syncSeatForPlayer(payment.playerId, payment.monthKey);
+    return NextResponse.json(payment);
+  }
+
+  // Admin reject claim
+  if (body.action === "reject") {
+    try {
+      await requireAdmin();
+    } catch {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    if (!body.id) {
+      return NextResponse.json({ error: "id required" }, { status: 400 });
+    }
+    const existing = await prisma.payment.findUnique({ where: { id: body.id } });
+    if (!existing || existing.status !== "claimed") {
+      return NextResponse.json({ error: "Claim not found" }, { status: 404 });
+    }
+    await prisma.payment.delete({ where: { id: body.id } });
+    return NextResponse.json({ ok: true });
+  }
+
+  // Admin log confirmed payment (default)
+  try {
+    await requireAdmin();
+  } catch {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   if (!body.playerId || !body.type || !(body.type in PAYMENT_AMOUNTS)) {
     return NextResponse.json(
@@ -100,10 +266,6 @@ export async function POST(request: Request) {
       ? Math.round(Number(body.amount) || 0)
       : PAYMENT_AMOUNTS[body.type];
 
-  if (body.type === "MONTHLY_INSTALMENT" && body.amount) {
-    amount = Math.round(Number(body.amount));
-  }
-  // Allow overriding amount for any type (instalments / custom)
   if (body.amount && body.amount > 0) {
     amount = Math.round(Number(body.amount));
   }
@@ -116,6 +278,7 @@ export async function POST(request: Request) {
     where: {
       playerId: body.playerId,
       monthKey,
+      status: "confirmed",
       type: { in: ["MONTHLY_5K", "MONTHLY_INSTALMENT"] },
     },
     _sum: { amount: true },
@@ -134,6 +297,7 @@ export async function POST(request: Request) {
       monthKey,
       type: body.type,
       amount,
+      status: "confirmed",
       note:
         body.note?.trim() ||
         (body.type === "MONTHLY_INSTALMENT" ? "Instalment" : null),
@@ -143,60 +307,13 @@ export async function POST(request: Request) {
 
   await prisma.player.update({
     where: { id: body.playerId },
-    data: {
-      seat,
-      status: "active",
-    },
+    data: { seat, status: "active" },
   });
 
   return NextResponse.json(payment, { status: 201 });
 }
 
-async function syncSeatForPlayer(playerId: string, monthKey: string) {
-  const total = await prisma.payment.aggregate({
-    where: {
-      playerId,
-      monthKey,
-      type: { in: ["MONTHLY_5K", "MONTHLY_INSTALMENT", "VISITOR_1_5K"] },
-    },
-    _sum: { amount: true },
-  });
-  const sum = total._sum.amount || 0;
-  const visitorOnly = await prisma.payment.count({
-    where: { playerId, monthKey, type: "VISITOR_1_5K" },
-  });
-  const monthly = await prisma.payment.count({
-    where: {
-      playerId,
-      monthKey,
-      type: { in: ["MONTHLY_5K", "MONTHLY_INSTALMENT"] },
-    },
-  });
-
-  let seat: "permanent" | "sub" = "sub";
-  if (monthly > 0 && sum >= PAYMENT_CYCLE.monthlyFee) seat = "permanent";
-  else if (monthly > 0 && sum > 0 && sum < PAYMENT_CYCLE.monthlyFee) {
-    // Partial monthly — keep permanent if already marked regular, else sub
-    const player = await prisma.player.findUnique({
-      where: { id: playerId },
-      select: { seat: true },
-    });
-    seat = player?.seat === "permanent" ? "permanent" : "sub";
-  } else if (visitorOnly > 0 && monthly === 0) seat = "sub";
-
-  await prisma.player.update({
-    where: { id: playerId },
-    data: { seat },
-  });
-}
-
 export async function PATCH(request: Request) {
-  try {
-    await requireAdmin();
-  } catch {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   const body = (await request.json()) as {
     id?: string;
     amount?: number;
@@ -211,6 +328,22 @@ export async function PATCH(request: Request) {
   const existing = await prisma.payment.findUnique({ where: { id: body.id } });
   if (!existing) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  const sessionId = await getPlayerIdFromSession();
+  let asAdmin = false;
+  try {
+    await requireAdmin();
+    asAdmin = true;
+  } catch {
+    asAdmin = false;
+  }
+
+  // Player may only edit their own claimed payment
+  if (!asAdmin) {
+    if (!sessionId || sessionId !== existing.playerId || existing.status !== "claimed") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
   }
 
   const amount =
@@ -234,24 +367,18 @@ export async function PATCH(request: Request) {
             (type === "MONTHLY_INSTALMENT" ? "Instalment" : null),
     },
     include: {
-      player: {
-        select: { id: true, name: true, seat: true },
-      },
+      player: { select: { id: true, name: true, seat: true } },
     },
   });
 
-  await syncSeatForPlayer(payment.playerId, payment.monthKey);
+  if (payment.status === "confirmed") {
+    await syncSeatForPlayer(payment.playerId, payment.monthKey);
+  }
 
   return NextResponse.json(payment);
 }
 
 export async function DELETE(request: Request) {
-  try {
-    await requireAdmin();
-  } catch {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   const { searchParams } = new URL(request.url);
   const id = searchParams.get("id");
   if (!id) {
@@ -263,8 +390,25 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
+  const sessionId = await getPlayerIdFromSession();
+  let asAdmin = false;
+  try {
+    await requireAdmin();
+    asAdmin = true;
+  } catch {
+    asAdmin = false;
+  }
+
+  if (!asAdmin) {
+    if (!sessionId || sessionId !== existing.playerId || existing.status !== "claimed") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+  }
+
   await prisma.payment.delete({ where: { id } });
-  await syncSeatForPlayer(existing.playerId, existing.monthKey);
+  if (existing.status === "confirmed") {
+    await syncSeatForPlayer(existing.playerId, existing.monthKey);
+  }
 
   return NextResponse.json({ ok: true });
 }

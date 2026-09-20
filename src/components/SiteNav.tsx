@@ -24,6 +24,9 @@ const pageLinks = [
   { href: "/feedback", label: "Feedback" },
 ];
 
+/** Logged-in shortcut — shown separately as Dashboard. */
+const DASHBOARD_HREF = "/me";
+
 export function SiteNav({
   variant = "app",
   sectionLinks = [],
@@ -99,7 +102,7 @@ export function SiteNav({
       {player ? (
         <>
           <Link
-            href="/me"
+            href={DASHBOARD_HREF}
             className={`${linkClass} inline-flex items-center gap-2`}
             onClick={() => setOpen(false)}
           >
@@ -109,7 +112,7 @@ export function SiteNav({
               photoPath={player.photoPath}
               size="sm"
             />
-            {player.name.split(" ")[0] || "Profile"}
+            Dashboard
           </Link>
           {player.isAdmin ? (
             <Link
@@ -208,19 +211,19 @@ export function SiteNav({
               ))}
               {player ? (
                 <>
-                  <Link
-                    href="/me"
-                    className={`${mobileLinkClass} flex items-center gap-3`}
-                    onClick={() => setOpen(false)}
-                  >
-                    <PlayerAvatar
-                      id={player.id}
-                      name={player.name}
-                      photoPath={player.photoPath}
-                      size="sm"
-                    />
-                    {player.name.split(" ")[0] || "Profile"}
-                  </Link>
+                <Link
+                  href={DASHBOARD_HREF}
+                  className={`${mobileLinkClass} flex items-center gap-3`}
+                  onClick={() => setOpen(false)}
+                >
+                  <PlayerAvatar
+                    id={player.id}
+                    name={player.name}
+                    photoPath={player.photoPath}
+                    size="sm"
+                  />
+                  Dashboard
+                </Link>
                   {player.isAdmin ? (
                     <Link
                       href="/admin"

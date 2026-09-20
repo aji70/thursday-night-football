@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AppChrome } from "@/components/AppChrome";
-import type { PlayerStatRow } from "@/lib/league-db";
+import { PAYMENT_CYCLE, type PlayerStatRow } from "@/lib/league-db";
 import type { StandingRow } from "@/lib/standings";
 
 type StatsPayload = {
@@ -40,8 +40,11 @@ export function TablesClient() {
     <AppChrome title="Tables">
       <p className="text-muted">
         League standings and player charts for{" "}
-        <span className="text-chalk">{monthKey || "…"}</span>. Tiebreakers: points
-        → clean sheets → GD → GF → head-to-head → discipline.
+        <span className="text-chalk">
+          {monthKey ? PAYMENT_CYCLE.label : "…"}
+        </span>
+        . Tiebreakers: points → clean sheets → GD → GF → head-to-head →
+        discipline.
       </p>
 
       {error ? <p className="mt-6 text-danger">{error}</p> : null}

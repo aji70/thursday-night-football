@@ -10,6 +10,16 @@ export const PAYMENT_CYCLE = {
   label: "24 Sep – 15 Oct 2026",
   monthlyFee: 5000,
   visitorFee: 1500,
+  /**
+   * Thursday dates for each fixture week in this cycle.
+   * Update together with key/label when rolling to a new cycle.
+   */
+  weekDates: {
+    1: "2026-09-24",
+    2: "2026-10-01",
+    3: "2026-10-08",
+    4: "2026-10-15",
+  } as Record<1 | 2 | 3 | 4, string>,
 } as const;
 
 export const PAYMENT_ACCOUNT = {

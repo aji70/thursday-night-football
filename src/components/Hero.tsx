@@ -23,7 +23,7 @@ export function Hero() {
   return (
     <section
       id="top"
-      className="relative isolate flex min-h-[100svh] items-end overflow-hidden"
+      className="relative isolate flex min-h-[100svh] items-start overflow-hidden"
       aria-label="Thursday Night Football"
     >
       <div className="absolute inset-0 -z-10">
@@ -39,7 +39,7 @@ export function Hero() {
         <div className="absolute inset-0 bg-gradient-to-t from-pitch-deep via-pitch-deep/45 to-pitch-deep/30" />
       </div>
 
-      <div className="section-shell hero-copy w-full pb-16 pt-28 sm:pb-20 sm:pt-32">
+      <div className="section-shell hero-copy w-full pb-16 pt-20 sm:pb-20 sm:pt-24">
         <p className="font-display print-ink text-[clamp(2.75rem,10vw,5.75rem)] leading-[0.9] tracking-[0.04em] text-chalk">
           Thursday Night Football
         </p>

@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
-import { currentMonthKey } from "@/lib/league-db";
+import { PAYMENT_CYCLE } from "@/lib/league-db";
 import { prisma } from "@/lib/prisma";
+import { applyCardSuspension } from "@/lib/suspensions";
 
 const EVENT_TYPES = new Set(["GOAL", "ASSIST", "YC", "RC"]);
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const monthKey = searchParams.get("month") || currentMonthKey();
+  const monthKey = searchParams.get("month") || PAYMENT_CYCLE.key;
 
   const events = await prisma.matchEvent.findMany({
     where: { monthKey },
@@ -47,17 +48,24 @@ export async function POST(request: Request) {
     );
   }
 
+  const monthKey = body.monthKey || PAYMENT_CYCLE.key;
+  const count = body.count && body.count > 0 ? body.count : 1;
+
   const event = await prisma.matchEvent.create({
     data: {
       playerId: body.playerId,
-      monthKey: body.monthKey || currentMonthKey(),
+      monthKey,
       week: body.week,
       match: body.match,
       type: body.type,
-      count: body.count && body.count > 0 ? body.count : 1,
+      count,
     },
     include: { player: true },
   });
+
+  if (body.type === "YC" || body.type === "RC") {
+    await applyCardSuspension(body.playerId, body.type, count, monthKey);
+  }
 
   return NextResponse.json(event, { status: 201 });
 }

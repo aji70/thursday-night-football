@@ -4,7 +4,10 @@ import { prisma } from "@/lib/prisma";
 
 export async function GET() {
   const [payments, expenses, ledger, walkIns] = await Promise.all([
-    prisma.payment.findMany({ orderBy: { paidAt: "desc" } }),
+    prisma.payment.findMany({
+      where: { status: "confirmed" },
+      orderBy: { paidAt: "desc" },
+    }),
     prisma.expense.findMany({ orderBy: { spentAt: "desc" } }),
     prisma.purseLedger.findMany({ orderBy: { createdAt: "desc" } }),
     prisma.walkInPayment.findMany({ orderBy: { paidAt: "desc" } }),

@@ -4,6 +4,7 @@ import { fixtureTeamNumbers } from "@/data/league";
 import { PAYMENT_CYCLE } from "@/lib/league-db";
 import { prisma } from "@/lib/prisma";
 import { buildStandings } from "@/lib/standings";
+import { serveSuspensionsForTeam } from "@/lib/suspensions";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -97,6 +98,10 @@ export async function POST(request: Request) {
 
   const monthKey = body.monthKey || PAYMENT_CYCLE.key;
 
+  const existing = await prisma.matchResult.findUnique({
+    where: { monthKey_week_match: { monthKey, week, match } },
+  });
+
   const result = await prisma.matchResult.upsert({
     where: {
       monthKey_week_match: { monthKey, week, match },
@@ -118,6 +123,12 @@ export async function POST(request: Request) {
     },
     include: { homeTeam: true, awayTeam: true },
   });
+
+  // Serve one ban match only when this fixture result is first logged.
+  if (!existing) {
+    await serveSuspensionsForTeam(homeTeam.id);
+    await serveSuspensionsForTeam(awayTeam.id);
+  }
 
   return NextResponse.json(result, { status: 201 });
 }

@@ -5,6 +5,11 @@ import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AppChrome } from "@/components/AppChrome";
 import { PaymentProofBox } from "@/components/PaymentProofBox";
+import { WHATSAPP } from "@/lib/league-db";
+
+const verifyRegisterUrl = `${WHATSAPP.adminChatUrl}?text=${encodeURIComponent(
+  "Hi Aji — I just registered for Thursday Night Football. My name is ",
+)}`;
 
 export function RegisterForm() {
   const router = useRouter();
@@ -52,8 +57,16 @@ export function RegisterForm() {
         Create a player profile with your phone number. Pay{" "}
         <strong className="text-chalk">₦5,000 / month</strong> for a regular
         seat, or <strong className="text-chalk">₦1,500 / week</strong> as a
-        visitor. Send proof of payment with your full name to the WhatsApp
-        group or to Aji.
+        visitor. After you register,{" "}
+        <a
+          href={verifyRegisterUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-flood underline-offset-2 hover:underline"
+        >
+          WhatsApp Aji
+        </a>{" "}
+        so he can verify you, then send proof of payment with your full name.
       </p>
 
       <PaymentProofBox className="mt-6 max-w-xl" />

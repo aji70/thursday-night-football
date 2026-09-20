@@ -56,6 +56,7 @@ type PaymentRow = {
   amount: number;
   note: string | null;
   paidAt: string;
+  status?: string;
   player: { id: string; name: string };
 };
 
@@ -341,8 +342,15 @@ export function AdminClient() {
             await refresh();
           }}
         />
-        <PaymentEditList
+        <ClaimReviewList
           payments={payments}
+          onDone={async (msg) => {
+            flash(msg);
+            await refresh();
+          }}
+        />
+        <PaymentEditList
+          payments={payments.filter((p) => p.status !== "claimed")}
           onDone={async (msg) => {
             flash(msg);
             await refresh();
@@ -740,6 +748,72 @@ function WalkInForm({ onDone }: { onDone: () => Promise<void> }) {
         Log
       </button>
     </form>
+  );
+}
+
+function ClaimReviewList({
+  payments,
+  onDone,
+}: {
+  payments: PaymentRow[];
+  onDone: (msg: string) => Promise<void>;
+}) {
+  const claims = payments.filter((p) => p.status === "claimed");
+  if (claims.length === 0) return null;
+
+  return (
+    <div className="mt-8">
+      <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-flood">
+        Pending player claims
+      </h3>
+      <p className="mt-1 text-sm text-muted">
+        Confirm against the bank statement, then Confirm or Reject.
+      </p>
+      <ul className="mt-4 border-t border-line">
+        {claims.map((p) => (
+          <li
+            key={p.id}
+            className="flex flex-wrap items-center justify-between gap-3 border-b border-line py-3 text-sm"
+          >
+            <span className="text-muted">
+              <span className="text-chalk">{p.player.name}</span>
+              {" · "}
+              {formatNaira(p.amount)} · {p.type.replace(/_/g, " ")}
+            </span>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                className="bg-flood px-3 py-1.5 text-xs font-semibold text-pitch-deep"
+                onClick={async () => {
+                  await fetch("/api/payments", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ action: "confirm", id: p.id }),
+                  });
+                  await onDone(`Confirmed ${p.player.name}`);
+                }}
+              >
+                Confirm
+              </button>
+              <button
+                type="button"
+                className="text-xs text-danger"
+                onClick={async () => {
+                  await fetch("/api/payments", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ action: "reject", id: p.id }),
+                  });
+                  await onDone(`Rejected claim from ${p.player.name}`);
+                }}
+              >
+                Reject
+              </button>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
