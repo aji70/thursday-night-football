@@ -30,6 +30,7 @@ model Player {
   updatedAt    DateTime     @updatedAt
   payments     Payment[]
   events       MatchEvent[]
+  feedback     Feedback[]
 
   @@index([name])
   @@index([status])
@@ -39,8 +40,8 @@ model Payment {
   id        String   @id @default(cuid())
   playerId  String
   player    Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
-  monthKey  String // e.g. 2026-09
-  type      String // MONTHLY_5K | VISITOR_1_5K
+  monthKey  String // e.g. 2026-09-cycle
+  type      String // MONTHLY_5K | MONTHLY_INSTALMENT | VISITOR_1_5K
   amount    Int
   note      String?
   paidAt    DateTime @default(now())
@@ -72,4 +73,27 @@ model Expense {
   note      String?
   spentAt   DateTime @default(now())
   createdAt DateTime @default(now())
+}
+
+model PurseLedger {
+  id        String   @id @default(cuid())
+  kind      String // CARRYOVER | ADJUSTMENT
+  title     String
+  amount    Int
+  note      String?
+  createdAt DateTime @default(now())
+}
+
+model Feedback {
+  id        String   @id @default(cuid())
+  type      String // suggestion | complaint
+  message   String
+  name      String?
+  playerId  String?
+  player    Player?  @relation(fields: [playerId], references: [id], onDelete: SetNull)
+  status    String   @default("new") // new | read | resolved
+  createdAt DateTime @default(now())
+
+  @@index([status])
+  @@index([type])
 }

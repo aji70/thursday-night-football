@@ -16,6 +16,7 @@ const pageLinks = [
   { href: "/players", label: "Players" },
   { href: "/payments", label: "Payments" },
   { href: "/purse", label: "Purse" },
+  { href: "/feedback", label: "Feedback" },
 ];
 
 export function SiteNav({

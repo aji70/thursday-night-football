@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AppChrome, formatNaira } from "@/components/AppChrome";
+import { PAYMENT_ACCOUNT, PAYMENT_CYCLE } from "@/lib/league-db";
 
 type Expense = {
   id: string;
@@ -11,11 +12,23 @@ type Expense = {
   spentAt: string;
 };
 
+type Ledger = {
+  id: string;
+  kind: string;
+  title: string;
+  amount: number;
+  note: string | null;
+  createdAt: string;
+};
+
 type PursePayload = {
   income: number;
+  feesIn: number;
+  ledgerIn: number;
   spent: number;
   balance: number;
   expenses: Expense[];
+  ledger: Ledger[];
 };
 
 export function PurseClient() {
@@ -32,53 +45,36 @@ export function PurseClient() {
   return (
     <AppChrome title="Squad purse">
       <p className="max-w-xl text-muted">
-        Transparent purse: fees in, spending out. Management logs every expense
-        here.
+        Cycle {PAYMENT_CYCLE.label}. Fees + carryover − spending. Pay to{" "}
+        <span className="text-chalk">
+          {PAYMENT_ACCOUNT.accountNumber} ({PAYMENT_ACCOUNT.bank})
+        </span>
+        .
       </p>
 
       {error ? <p className="mt-6 text-danger">{error}</p> : null}
 
-      <div className="mt-8 grid gap-4 sm:grid-cols-3">
-        <div className="border border-line px-4 py-5">
-          <p className="text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-muted">
-            Income
-          </p>
-          <p className="font-display mt-2 text-3xl text-flood">
-            {formatNaira(data?.income ?? 0)}
-          </p>
-        </div>
-        <div className="border border-line px-4 py-5">
-          <p className="text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-muted">
-            Spent
-          </p>
-          <p className="font-display mt-2 text-3xl text-flood-soft">
-            {formatNaira(data?.spent ?? 0)}
-          </p>
-        </div>
-        <div className="border border-line px-4 py-5">
-          <p className="text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-muted">
-            Balance
-          </p>
-          <p className="font-display mt-2 text-3xl text-chalk">
-            {formatNaira(data?.balance ?? 0)}
-          </p>
-        </div>
+      <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Stat label="Carryover / ledger" value={data?.ledgerIn ?? 0} />
+        <Stat label="Fees in" value={data?.feesIn ?? 0} />
+        <Stat label="Spent" value={data?.spent ?? 0} />
+        <Stat label="Balance" value={data?.balance ?? 0} highlight />
       </div>
 
-      <h2 className="font-display mt-12 text-2xl text-chalk">Expenses</h2>
+      <h2 className="font-display mt-12 text-2xl text-chalk">Ledger</h2>
       <ul className="mt-4 border-t border-line">
-        {(data?.expenses ?? []).length === 0 ? (
-          <li className="py-6 text-muted">No expenses logged yet.</li>
+        {(data?.ledger ?? []).length === 0 ? (
+          <li className="py-6 text-muted">No ledger entries.</li>
         ) : (
-          data!.expenses.map((e) => (
+          data!.ledger.map((e) => (
             <li
               key={e.id}
-              className="grid gap-1 border-b border-line py-4 sm:grid-cols-[1fr_auto] sm:items-baseline"
+              className="grid gap-1 border-b border-line py-4 sm:grid-cols-[1fr_auto]"
             >
               <div>
                 <p className="font-semibold text-chalk">{e.title}</p>
                 <p className="text-sm text-muted">
-                  {new Date(e.spentAt).toLocaleDateString()}
+                  {e.kind}
                   {e.note ? ` · ${e.note}` : ""}
                 </p>
               </div>
@@ -89,6 +85,54 @@ export function PurseClient() {
           ))
         )}
       </ul>
+
+      <h2 className="font-display mt-12 text-2xl text-chalk">Expenses</h2>
+      <ul className="mt-4 border-t border-line">
+        {(data?.expenses ?? []).length === 0 ? (
+          <li className="py-6 text-muted">No expenses logged yet.</li>
+        ) : (
+          data!.expenses.map((e) => (
+            <li
+              key={e.id}
+              className="grid gap-1 border-b border-line py-4 sm:grid-cols-[1fr_auto]"
+            >
+              <div>
+                <p className="font-semibold text-chalk">{e.title}</p>
+                <p className="text-sm text-muted">
+                  {new Date(e.spentAt).toLocaleDateString()}
+                  {e.note ? ` · ${e.note}` : ""}
+                </p>
+              </div>
+              <p className="font-display text-xl text-flood-soft">
+                −{formatNaira(e.amount)}
+              </p>
+            </li>
+          ))
+        )}
+      </ul>
     </AppChrome>
+  );
+}
+
+function Stat({
+  label,
+  value,
+  highlight,
+}: {
+  label: string;
+  value: number;
+  highlight?: boolean;
+}) {
+  return (
+    <div className="border border-line px-4 py-5">
+      <p className="text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-muted">
+        {label}
+      </p>
+      <p
+        className={`font-display mt-2 text-3xl ${highlight ? "text-chalk" : "text-flood"}`}
+      >
+        {formatNaira(value)}
+      </p>
+    </div>
   );
 }

@@ -52,14 +52,26 @@ export function AdminClient() {
   const [events, setEvents] = useState<EventRow[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [balance, setBalance] = useState(0);
+  const [feedback, setFeedback] = useState<
+    {
+      id: string;
+      type: string;
+      message: string;
+      name: string | null;
+      status: string;
+      createdAt: string;
+      player: { name: string } | null;
+    }[]
+  >([]);
   const [message, setMessage] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    const [pRes, tRes, eRes, xRes] = await Promise.all([
+    const [pRes, tRes, eRes, xRes, fRes] = await Promise.all([
       fetch("/api/players"),
       fetch("/api/teams"),
       fetch("/api/events"),
       fetch("/api/expenses"),
+      fetch("/api/feedback"),
     ]);
     setPlayers(await pRes.json());
     setTeams(await tRes.json());
@@ -68,6 +80,7 @@ export function AdminClient() {
     const purse = await xRes.json();
     setExpenses(purse.expenses ?? []);
     setBalance(purse.balance ?? 0);
+    if (fRes.ok) setFeedback(await fRes.json());
   }, []);
 
   useEffect(() => {
@@ -335,6 +348,66 @@ export function AdminClient() {
       </section>
 
       <section className="mt-12 border-t border-line pt-8">
+        <h2 className="font-display text-2xl text-chalk">
+          Suggestions &amp; complaints
+        </h2>
+        <ul className="mt-4 space-y-3">
+          {feedback.length === 0 ? (
+            <li className="text-muted">None yet</li>
+          ) : (
+            feedback.map((item) => (
+              <li key={item.id} className="border border-line px-4 py-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-sm font-semibold uppercase tracking-[0.08em] text-flood">
+                    {item.type}
+                    {item.status !== "new" ? ` · ${item.status}` : ""}
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      className="text-xs text-muted"
+                      onClick={async () => {
+                        await fetch("/api/feedback", {
+                          method: "PATCH",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ id: item.id, status: "read" }),
+                        });
+                        await refresh();
+                      }}
+                    >
+                      Mark read
+                    </button>
+                    <button
+                      type="button"
+                      className="text-xs text-flood"
+                      onClick={async () => {
+                        await fetch("/api/feedback", {
+                          method: "PATCH",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            id: item.id,
+                            status: "resolved",
+                          }),
+                        });
+                        await refresh();
+                      }}
+                    >
+                      Resolve
+                    </button>
+                  </div>
+                </div>
+                <p className="mt-2 text-chalk">{item.message}</p>
+                <p className="mt-1 text-xs text-muted">
+                  {item.player?.name || item.name || "Anonymous"} ·{" "}
+                  {new Date(item.createdAt).toLocaleString()}
+                </p>
+              </li>
+            ))
+          )}
+        </ul>
+      </section>
+
+      <section className="mt-12 border-t border-line pt-8">
         <h2 className="font-display text-2xl text-chalk">Add expense</h2>
         <ExpenseForm
           onDone={async () => {
@@ -381,18 +454,26 @@ function PaymentForm({
   onDone: () => Promise<void>;
 }) {
   const [playerId, setPlayerId] = useState("");
-  const [type, setType] = useState<"MONTHLY_5K" | "VISITOR_1_5K">("MONTHLY_5K");
+  const [type, setType] = useState<
+    "MONTHLY_5K" | "MONTHLY_INSTALMENT" | "VISITOR_1_5K"
+  >("MONTHLY_5K");
+  const [amount, setAmount] = useState("5000");
 
   return (
     <form
-      className="mt-4 grid max-w-2xl gap-3 sm:grid-cols-[1fr_auto_auto]"
+      className="mt-4 grid max-w-3xl gap-3 sm:grid-cols-[1fr_auto_7rem_auto]"
       onSubmit={async (e) => {
         e.preventDefault();
         if (!playerId) return;
         await fetch("/api/payments", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ playerId, type }),
+          body: JSON.stringify({
+            playerId,
+            type,
+            amount: Number(amount),
+            note: type === "MONTHLY_INSTALMENT" ? "Instalment" : undefined,
+          }),
         });
         setPlayerId("");
         await onDone();
@@ -414,12 +495,30 @@ function PaymentForm({
       <select
         className={field}
         value={type}
-        onChange={(e) => setType(e.target.value as typeof type)}
+        onChange={(e) => {
+          const next = e.target.value as typeof type;
+          setType(next);
+          if (next === "MONTHLY_5K") setAmount("5000");
+          if (next === "VISITOR_1_5K") setAmount("1500");
+          if (next === "MONTHLY_INSTALMENT") setAmount("3000");
+        }}
       >
-        <option value="MONTHLY_5K">₦5,000 monthly (permanent)</option>
-        <option value="VISITOR_1_5K">₦1,500 visitor (sub)</option>
+        <option value="MONTHLY_5K">Full monthly ₦5k</option>
+        <option value="MONTHLY_INSTALMENT">Instalment</option>
+        <option value="VISITOR_1_5K">Visitor ₦1.5k</option>
       </select>
-      <button type="submit" className="bg-flood px-4 py-2 text-sm font-semibold text-pitch-deep">
+      <input
+        className={field}
+        type="number"
+        min={1}
+        value={amount}
+        onChange={(e) => setAmount(e.target.value)}
+        required
+      />
+      <button
+        type="submit"
+        className="bg-flood px-4 py-2 text-sm font-semibold text-pitch-deep"
+      >
         Log pay
       </button>
     </form>

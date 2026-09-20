@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getPlayerIdFromSession, publicPlayer } from "@/lib/auth";
 import {
-  currentMonthKey,
+  PAYMENT_CYCLE,
   overallScore,
 } from "@/lib/league-db";
 import { prisma } from "@/lib/prisma";
@@ -13,7 +13,7 @@ export async function GET(request: Request) {
   }
 
   const { searchParams } = new URL(request.url);
-  const monthKey = searchParams.get("month") || currentMonthKey();
+  const monthKey = searchParams.get("month") || PAYMENT_CYCLE.key;
 
   const player = await prisma.player.findUnique({
     where: { id: playerId },
