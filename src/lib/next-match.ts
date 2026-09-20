@@ -144,3 +144,21 @@ export function findNextSession(today = new Date()): NextSessionInfo | null {
   }
   return null;
 }
+
+/** Next single fixture (opening kick of the next matchday). */
+export function findNextFixture(today = new Date()) {
+  const session = findNextSession(today);
+  if (!session || session.fixtures.length === 0) return null;
+  const row = session.fixtures[0];
+  const kickoff = row.time.split("–")[0]?.trim() || row.time;
+  return {
+    week: session.week,
+    match: row.match,
+    date: session.date,
+    dateLabel: session.dateLabel,
+    time: row.time,
+    kickoff,
+    fixture: row.fixture,
+    officiating: row.officiating,
+  };
+}

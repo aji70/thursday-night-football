@@ -3,8 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState } from "react";
-import { venue } from "@/data/league";
-import { findNextSession } from "@/lib/next-match";
+import { findNextFixture } from "@/lib/next-match";
 
 type NextMatch = {
   week: number;
@@ -14,10 +13,22 @@ type NextMatch = {
   opponentLabel: string;
 } | null;
 
+type NewsItem = {
+  id: string;
+  title: string;
+  summary?: string | null;
+  pinned?: boolean;
+} | null;
+
+const stripCardClass =
+  "border border-chalk/20 bg-pitch-deep/95 px-4 py-3.5 shadow-[0_8px_24px_rgba(0,0,0,0.35)] backdrop-blur-md transition hover:border-flood/45";
+
 export function Hero() {
   const [loggedIn, setLoggedIn] = useState(false);
   const [nextMatch, setNextMatch] = useState<NextMatch>(null);
-  const session = findNextSession();
+  const [news, setNews] = useState<NewsItem>(null);
+  const [newsChecked, setNewsChecked] = useState(false);
+  const nextFixture = findNextFixture();
 
   useEffect(() => {
     fetch("/api/auth/login")
@@ -43,9 +54,28 @@ export function Hero() {
         }
       })
       .catch(() => {});
-  }, []);
 
-  const previewFixtures = session?.fixtures.slice(0, 2) ?? [];
+    // News API lands with NewsPost — until then keep the empty-state card.
+    fetch("/api/news?limit=1")
+      .then(async (r) => {
+        if (!r.ok) return null;
+        return r.json();
+      })
+      .then((data) => {
+        const post =
+          data?.posts?.[0] ?? data?.post ?? data?.items?.[0] ?? null;
+        if (post?.title) {
+          setNews({
+            id: post.id,
+            title: post.title,
+            summary: post.summary ?? post.excerpt ?? null,
+            pinned: Boolean(post.pinned),
+          });
+        }
+      })
+      .catch(() => {})
+      .finally(() => setNewsChecked(true));
+  }, []);
 
   return (
     <section
@@ -78,7 +108,7 @@ export function Hero() {
         />
       </div>
 
-      <div className="section-shell relative flex flex-col gap-8 pt-[4.75rem] pb-8 sm:gap-10 sm:pt-[5.25rem] sm:pb-10">
+      <div className="section-shell relative flex flex-col gap-8 pt-[4.75rem] pb-8 sm:gap-9 sm:pt-[5.25rem] sm:pb-9">
         <div className="hero-copy max-w-3xl">
           <p className="font-display print-ink text-[clamp(2.35rem,7.5vw,4.25rem)] leading-[0.9] tracking-[0.04em] text-chalk drop-shadow-[0_2px_14px_rgba(6,21,15,0.7)]">
             Thursday Night Football
@@ -132,45 +162,56 @@ export function Hero() {
           </div>
         </div>
 
-        {/* Fixtures strip — no news until that ships */}
-        <div className="no-print w-full max-w-3xl">
-          {session ? (
-            <div className="flex gap-3 overflow-x-auto pb-1 sm:grid sm:grid-cols-3 sm:overflow-visible sm:pb-0">
-              <Link
-                href="/rules#fixtures"
-                className="min-w-[11.5rem] shrink-0 border border-line bg-pitch-deep/55 px-4 py-3 backdrop-blur-sm transition hover:border-flood/50 sm:min-w-0"
-              >
-                <p className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-flood">
-                  Next matchday
+        {/* News + next fixture — two cards only */}
+        <div className="no-print grid w-full max-w-3xl grid-cols-1 gap-3 sm:grid-cols-2">
+          {news ? (
+            <Link href={`/news/${news.id}`} className={stripCardClass}>
+              <p className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-flood">
+                {news.pinned ? "Pinned" : "Latest"}
+              </p>
+              <p className="mt-1.5 font-semibold leading-snug text-chalk">
+                {news.title}
+              </p>
+              {news.summary ? (
+                <p className="mt-1.5 line-clamp-2 text-sm text-muted">
+                  {news.summary}
                 </p>
-                <p className="mt-1.5 font-display text-xl leading-none text-chalk">
-                  Week {session.week}
-                </p>
-                <p className="mt-1.5 text-sm text-chalk/90">{session.dateLabel}</p>
-                <p className="mt-0.5 text-xs text-muted">
-                  {venue.name} · {venue.session}
-                </p>
-              </Link>
-              {previewFixtures.map((row) => (
-                <Link
-                  key={row.match}
-                  href="/rules#fixtures"
-                  className="min-w-[11.5rem] shrink-0 border border-line bg-pitch-deep/55 px-4 py-3 backdrop-blur-sm transition hover:border-flood/50 sm:min-w-0"
-                >
-                  <p className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-flood">
-                    Match {row.match}
-                  </p>
-                  <p className="mt-1.5 font-semibold leading-snug text-chalk">
-                    {row.fixture}
-                  </p>
-                  <p className="mt-1.5 text-sm text-muted">{row.time}</p>
-                </Link>
-              ))}
-            </div>
+              ) : null}
+            </Link>
           ) : (
-            <p className="border border-line bg-pitch-deep/55 px-4 py-3 text-sm text-muted backdrop-blur-sm">
-              Check back after Matchday 1 — fixtures will show here.
-            </p>
+            <div className={stripCardClass}>
+              <p className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-flood">
+                News
+              </p>
+              <p className="mt-1.5 text-sm leading-snug text-muted">
+                {newsChecked
+                  ? "No news yet — check back after Matchday 1"
+                  : "Loading…"}
+              </p>
+            </div>
+          )}
+
+          {nextFixture ? (
+            <Link href="/rules#fixtures" className={stripCardClass}>
+              <p className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-flood">
+                Next fixture
+              </p>
+              <p className="mt-1.5 font-semibold leading-snug text-chalk">
+                {nextFixture.fixture}
+              </p>
+              <p className="mt-1.5 text-sm text-muted">
+                {nextFixture.dateLabel} · {nextFixture.kickoff}
+              </p>
+            </Link>
+          ) : (
+            <div className={stripCardClass}>
+              <p className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-flood">
+                Next fixture
+              </p>
+              <p className="mt-1.5 text-sm text-muted">
+                Check back after Matchday 1
+              </p>
+            </div>
           )}
         </div>
       </div>
