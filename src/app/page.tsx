@@ -1,5 +1,4 @@
 import { Hero } from "@/components/Hero";
-import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 
 export default function HomePage() {
@@ -9,7 +8,6 @@ export default function HomePage() {
       <main>
         <Hero />
       </main>
-      <SiteFooter />
     </>
   );
 }

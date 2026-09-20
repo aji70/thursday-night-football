@@ -105,3 +105,42 @@ export function findNextMatch(
 
   return null;
 }
+
+export type NextSessionInfo = {
+  week: 1 | 2 | 3 | 4;
+  date: string;
+  dateLabel: string;
+  fixtures: {
+    match: number;
+    time: string;
+    fixture: string;
+    officiating: string;
+  }[];
+};
+
+/** Next Thursday session in the cycle (calendar), with that night's fixtures. */
+export function findNextSession(today = new Date()): NextSessionInfo | null {
+  const startOfToday = new Date(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate(),
+  );
+
+  for (const week of [1, 2, 3, 4] as const) {
+    const ymd = PAYMENT_CYCLE.weekDates[week];
+    const weekDate = parseYmd(ymd);
+    if (weekDate < startOfToday) continue;
+    return {
+      week,
+      date: ymd,
+      dateLabel: formatDateLabel(ymd),
+      fixtures: fixturesByWeek[week].map((row) => ({
+        match: row.match,
+        time: row.time,
+        fixture: row.fixture,
+        officiating: row.officiating,
+      })),
+    };
+  }
+  return null;
+}
