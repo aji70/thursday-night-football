@@ -53,15 +53,15 @@ export function TablesClient() {
             <tr>
               <th className="px-3 py-3">#</th>
               <th className="px-3 py-3">Team</th>
-              <th className="px-3 py-3">P</th>
-              <th className="px-3 py-3">W</th>
-              <th className="px-3 py-3">D</th>
-              <th className="px-3 py-3">L</th>
+              <th className="px-3 py-3">Played</th>
+              <th className="px-3 py-3">Points</th>
+              <th className="px-3 py-3">Win</th>
+              <th className="px-3 py-3">Draw</th>
+              <th className="px-3 py-3">Loss</th>
               <th className="px-3 py-3">GF</th>
               <th className="px-3 py-3">GA</th>
               <th className="px-3 py-3">GD</th>
               <th className="px-3 py-3">CS</th>
-              <th className="px-3 py-3">Pts</th>
             </tr>
           </thead>
           <tbody>
@@ -79,6 +79,9 @@ export function TablesClient() {
                     {row.name}
                   </td>
                   <td className="px-3 py-3 text-muted">{row.played}</td>
+                  <td className="px-3 py-3 font-semibold text-flood">
+                    {row.points}
+                  </td>
                   <td className="px-3 py-3 text-muted">{row.won}</td>
                   <td className="px-3 py-3 text-muted">{row.drawn}</td>
                   <td className="px-3 py-3 text-muted">{row.lost}</td>
@@ -88,9 +91,6 @@ export function TablesClient() {
                     {row.gd > 0 ? `+${row.gd}` : row.gd}
                   </td>
                   <td className="px-3 py-3 text-muted">{row.cleanSheets}</td>
-                  <td className="px-3 py-3 font-semibold text-flood">
-                    {row.points}
-                  </td>
                 </tr>
               ))
             )}
