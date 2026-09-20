@@ -21,6 +21,7 @@ type SummaryRow = {
   total: number;
   seat: string;
   remaining: number;
+  overpaid?: number;
   isInstalment: boolean;
   isPaid?: boolean;
 };
@@ -105,7 +106,11 @@ export function PaymentsClient() {
                     {formatNaira(row.total)}
                   </td>
                   <td className="px-4 py-3 text-muted">
-                    {row.remaining > 0 ? formatNaira(row.remaining) : "Cleared"}
+                    {row.overpaid && row.overpaid > 0
+                      ? `Over by ${formatNaira(row.overpaid)}`
+                      : row.remaining > 0
+                        ? formatNaira(row.remaining)
+                        : "Cleared"}
                   </td>
                 </tr>
               ))

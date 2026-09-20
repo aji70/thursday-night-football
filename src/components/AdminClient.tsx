@@ -311,6 +311,7 @@ export function AdminClient() {
         </p>
         <PaymentForm
           players={active}
+          payments={payments}
           onDone={async () => {
             flash("Payment logged");
             await refresh();
@@ -842,9 +843,11 @@ function PaymentEditList({
 
 function PaymentForm({
   players,
+  payments,
   onDone,
 }: {
   players: Player[];
+  payments: PaymentRow[];
   onDone: () => Promise<void>;
 }) {
   const [playerId, setPlayerId] = useState("");
@@ -853,19 +856,31 @@ function PaymentForm({
   >("MONTHLY_5K");
   const [amount, setAmount] = useState("5000");
 
+  const existingForPlayer = payments.filter((p) => p.player.id === playerId);
+  const existingTotal = existingForPlayer.reduce((s, p) => s + p.amount, 0);
+
   return (
     <form
       className="mt-4 grid max-w-3xl gap-3 sm:grid-cols-[1fr_auto_7rem_auto]"
       onSubmit={async (e) => {
         e.preventDefault();
         if (!playerId) return;
+        const nextAmount = Number(amount);
+        if (existingTotal > 0) {
+          const ok = confirm(
+            `This player already has ${formatNaira(existingTotal)} logged.\n\n` +
+              `Adding ${formatNaira(nextAmount)} will make the total ${formatNaira(existingTotal + nextAmount)}.\n\n` +
+              `To fix a wrong amount, Cancel and use Edit below instead of adding another payment.`,
+          );
+          if (!ok) return;
+        }
         await fetch("/api/payments", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             playerId,
             type,
-            amount: Number(amount),
+            amount: nextAmount,
             note: type === "MONTHLY_INSTALMENT" ? "Instalment" : undefined,
           }),
         });
@@ -915,6 +930,16 @@ function PaymentForm({
       >
         Log pay
       </button>
+      {playerId && existingTotal > 0 ? (
+        <p className="sm:col-span-4 text-sm text-flood-soft">
+          Already logged for this player: {formatNaira(existingTotal)}
+          {existingForPlayer.length > 1
+            ? ` across ${existingForPlayer.length} entries`
+            : ""}
+          . Use <strong className="text-chalk">Edit</strong> below to change an
+          amount — do not log again unless this is an extra instalment.
+        </p>
+      ) : null}
     </form>
   );
 }

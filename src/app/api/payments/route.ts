@@ -51,6 +51,7 @@ export async function GET(request: Request) {
       total,
       seat: player.seat,
       remaining: Math.max(0, PAYMENT_CYCLE.monthlyFee - total),
+      overpaid: Math.max(0, total - PAYMENT_CYCLE.monthlyFee),
       isInstalment: total > 0 && total < PAYMENT_CYCLE.monthlyFee,
       isPaid: total >= PAYMENT_CYCLE.monthlyFee,
     };
