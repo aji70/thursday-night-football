@@ -1,14 +1,7 @@
-import Link from "next/link";
+"use client";
 
-const links = [
-  { href: "/", label: "Rules" },
-  { href: "/tables", label: "Tables" },
-  { href: "/players", label: "Players" },
-  { href: "/payments", label: "Payments" },
-  { href: "/purse", label: "Purse" },
-  { href: "/me", label: "My profile" },
-  { href: "/register", label: "Register" },
-];
+import Link from "next/link";
+import { SiteNav } from "@/components/SiteNav";
 
 export function AppChrome({
   title,
@@ -19,25 +12,15 @@ export function AppChrome({
 }) {
   return (
     <div className="min-h-screen">
-      <header className="border-b border-line bg-pitch-deep/80">
+      <header className="sticky top-0 z-40 border-b border-line bg-pitch-deep/95 backdrop-blur-sm">
         <div className="section-shell flex h-14 items-center justify-between gap-4 sm:h-16">
           <Link
             href="/"
-            className="font-display text-xl tracking-[0.12em] text-flood"
+            className="font-display shrink-0 text-xl tracking-[0.12em] text-flood"
           >
             TNF
           </Link>
-          <nav className="flex flex-wrap items-center justify-end gap-3 sm:gap-5">
-            {links.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-muted transition hover:text-chalk"
-              >
-                {link.label}
-              </Link>
-            ))}
-          </nav>
+          <SiteNav variant="app" />
         </div>
       </header>
       <main className="section-shell py-10 sm:py-14">
