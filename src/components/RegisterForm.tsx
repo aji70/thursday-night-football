@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AppChrome } from "@/components/AppChrome";
+import { PaymentProofBox } from "@/components/PaymentProofBox";
 
 export function RegisterForm() {
   const router = useRouter();
@@ -35,7 +36,7 @@ export function RegisterForm() {
       });
 
       setMessage(
-        "Profile created. You are pending admin verification — then your dashboard unlocks fully.",
+        "Profile created. Pay into the account below, then send proof with your name on WhatsApp.",
       );
       setTimeout(() => router.push("/me"), 800);
     } catch (err) {
@@ -48,12 +49,14 @@ export function RegisterForm() {
   return (
     <AppChrome title="Create your profile">
       <p className="max-w-xl text-muted">
-        Create a player profile with your phone number. Management verifies you
-        before you become active. Pay{" "}
-        <strong className="text-chalk">₦5,000 / month</strong> for a permanent
+        Create a player profile with your phone number. Pay{" "}
+        <strong className="text-chalk">₦5,000 / month</strong> for a regular
         seat, or <strong className="text-chalk">₦1,500 / week</strong> as a
-        visitor sub.
+        visitor. Send proof of payment with your full name to the WhatsApp
+        group or to Aji.
       </p>
+
+      <PaymentProofBox className="mt-6 max-w-xl" />
 
       <form onSubmit={onSubmit} className="mt-8 max-w-md space-y-5">
         <label className="grid gap-2 text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-muted">

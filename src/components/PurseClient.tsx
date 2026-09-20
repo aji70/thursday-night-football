@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { AppChrome, formatNaira } from "@/components/AppChrome";
-import { PAYMENT_ACCOUNT, PAYMENT_CYCLE } from "@/lib/league-db";
+import { PaymentProofBox } from "@/components/PaymentProofBox";
+import { PAYMENT_CYCLE } from "@/lib/league-db";
 
 type Expense = {
   id: string;
@@ -24,6 +25,7 @@ type Ledger = {
 type PursePayload = {
   income: number;
   feesIn: number;
+  walkInIn?: number;
   ledgerIn: number;
   spent: number;
   balance: number;
@@ -45,18 +47,17 @@ export function PurseClient() {
   return (
     <AppChrome title="Squad purse">
       <p className="max-w-xl text-muted">
-        Cycle {PAYMENT_CYCLE.label}. Fees + carryover − spending. Pay to{" "}
-        <span className="text-chalk">
-          {PAYMENT_ACCOUNT.accountNumber} ({PAYMENT_ACCOUNT.bank})
-        </span>
-        .
+        Cycle {PAYMENT_CYCLE.label}. Fees + carryover − spending.
       </p>
+
+      <PaymentProofBox className="mt-6 max-w-xl" />
 
       {error ? <p className="mt-6 text-danger">{error}</p> : null}
 
-      <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <Stat label="Carryover / ledger" value={data?.ledgerIn ?? 0} />
-        <Stat label="Fees in" value={data?.feesIn ?? 0} />
+        <Stat label="Registered fees" value={data?.feesIn ?? 0} />
+        <Stat label="On-field / walk-in" value={data?.walkInIn ?? 0} />
         <Stat label="Spent" value={data?.spent ?? 0} />
         <Stat label="Balance" value={data?.balance ?? 0} highlight />
       </div>

@@ -17,6 +17,44 @@ export const benefits = [
   },
 ] as const;
 
+/** Detailed proposal copy for the Rules executive summary. */
+export const proposalStory = {
+  eyebrow: "01 — Executive summary",
+  title: "The death of winner stays on",
+  intro:
+    "This is a new proposal for Thursday Night Football at Kadwell Pitch (Thursdays, 7:00–8:30 PM). It replaces the old winner-stays-on habit with a time-capped league so every paid player gets a fair night.",
+  problemTitle: "What was broken",
+  problem: [
+    "Turnout swings hard — sometimes ~12 players, sometimes close to 30. About 15 people show up most weeks; visitors can be 20–70% of the night.",
+    "Winner-stays-on (and short 7-minute hard stops) rewarded hot teams and stacked visitor groups. Regulars who paid and showed up could sit 20–30 minutes while the same sides kept the pitch.",
+    "Long sideline waits cooled legs, killed fitness, and made the night feel unfair even when people had paid.",
+  ],
+  proposalTitle: "What we are proposing",
+  proposal: [
+    "Four teams play a fixed rotation of short matches. When the match clock ends, both sides leave — win, draw, or lose. Nobody “earns” extra pitch time by winning.",
+    "Each team gets the same total minutes in a session (about 33 minutes of play). Paying and showing up guarantees game time, not a lottery.",
+    "Resting teams supply the matchday panel (refs / table). Peer officiating keeps the night moving and the stats honest.",
+    "The month is a four-week league cycle with a live table (3 points for a win, 1 for a draw). Clean sheets, goal difference, and the rest of the tiebreakers decide close races.",
+    "₦5,000 / month buys a regular (permanent) seat for the cycle. ₦1,500 / week is a visitor sub for that night only. Proof of payment goes to the WhatsApp group or to Aji.",
+  ],
+  nightTitle: "How a Thursday runs",
+  night: [
+    "Kick-off window: 7:00–8:30 PM at Kadwell Pitch.",
+    "Six short fixtures per night (about 11 minutes each, with quick turnarounds).",
+    "Teams rotate on and off the pitch on a published fixture list — no arguing for “one more game.”",
+    "While two teams play, the other two rest and help run the panel / log.",
+  ],
+  cycleTitle: "The four-week cycle",
+  cycle: [
+    "Week 1 is a live balancing window: management can reshuffle if a draft looks unfair.",
+    "After Matchday 1, regulars lock to their team for the rest of the month.",
+    "Points and stats accumulate on the Tables page. Accolades (Golden Boot, Assist King, etc.) follow the month.",
+    "After each cycle we can audit rules, fines, and match lengths — this is a living document, not a forever PDF.",
+  ],
+  askTitle: "What we need from the squad",
+  ask: "Read the full rules below, register on the site, pay into the published account, and send proof with your full name on WhatsApp. Show up on time. Respect the panel. Chase the table — not the pitch.",
+} as const;
+
 export const rosterRules = [
   {
     title: "Team names",
@@ -46,7 +84,7 @@ export const fees = [
     title: "Permanent seat",
     amount: "₦5,000 / month",
     detail:
-      "Regulars or visitors who pay ₦5,000 get a permanent team for the month. Drafted and locked after Matchday 1.",
+      "Regulars who pay ₦5,000 get a permanent team for the month. Send proof of payment with your name to the WhatsApp group or to Aji. Management can mark you regular before payment clears.",
   },
   {
     title: "Visitor sub",
@@ -121,7 +159,7 @@ export const pitchRules = [
   },
   {
     title: "Penalty kick",
-    copy: "Taken as usual — one foot on the ball. Wait for the panel's signal before the kick.",
+    copy: "Taken as usual — one foot on the ball. Wait for the referee's signal before the kick.",
   },
   {
     title: "Free-kick wall — one stride",
@@ -263,3 +301,16 @@ export const fixturesByWeek: Record<1 | 2 | 3 | 4, Fixture[]> = {
     { match: 6, time: "8:10–8:21", fixture: "Team 1 vs Team 2", officiating: "Team 3 & 4" },
   ],
 };
+
+/** Returns [homeTeamNumber, awayTeamNumber] for a scheduled fixture. */
+export function fixtureTeamNumbers(
+  week: number,
+  match: number,
+): [number, number] | null {
+  const w = week as 1 | 2 | 3 | 4;
+  const row = fixturesByWeek[w]?.find((f) => f.match === match);
+  if (!row) return null;
+  const m = row.fixture.match(/Team\s+(\d)\s+vs\s+Team\s+(\d)/i);
+  if (!m) return null;
+  return [Number(m[1]), Number(m[2])];
+}

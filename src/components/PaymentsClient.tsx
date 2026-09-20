@@ -1,8 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AppChrome, formatNaira } from "@/components/AppChrome";
-import { PAYMENT_ACCOUNT, PAYMENT_CYCLE } from "@/lib/league-db";
+import { PaymentProofBox } from "@/components/PaymentProofBox";
+import { PAYMENT_CYCLE } from "@/lib/league-db";
 
 type PaymentRow = {
   id: string;
@@ -10,7 +12,7 @@ type PaymentRow = {
   amount: number;
   note: string | null;
   paidAt: string;
-  player: { name: string; seat: string; team: { name: string } | null };
+  player: { name: string; seat: string };
 };
 
 type SummaryRow = {
@@ -22,17 +24,28 @@ type SummaryRow = {
   isInstalment: boolean;
 };
 
+type WalkIn = {
+  id: string;
+  name: string;
+  amount: number;
+  note: string | null;
+  paidAt: string;
+};
+
 export function PaymentsClient() {
   const [payments, setPayments] = useState<PaymentRow[]>([]);
   const [summary, setSummary] = useState<SummaryRow[]>([]);
+  const [walkIns, setWalkIns] = useState<WalkIn[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/payments")
-      .then((r) => r.json())
-      .then((data) => {
-        setPayments(data.payments ?? []);
-        setSummary(data.summary ?? []);
+    Promise.all([fetch("/api/payments"), fetch("/api/walk-ins")])
+      .then(async ([pRes, wRes]) => {
+        const pData = await pRes.json();
+        const wData = await wRes.json();
+        setPayments(pData.payments ?? []);
+        setSummary(pData.summary ?? []);
+        setWalkIns(wData.walkIns ?? []);
       })
       .catch(() => setError("Could not load payments"));
   }, []);
@@ -40,63 +53,88 @@ export function PaymentsClient() {
   return (
     <AppChrome title="Payments">
       <p className="text-muted">
-        Cycle: <span className="text-chalk">{PAYMENT_CYCLE.label}</span>. Monthly
-        fee ₦{PAYMENT_CYCLE.monthlyFee.toLocaleString()} · Visitor ₦
-        {PAYMENT_CYCLE.visitorFee.toLocaleString()}/week. Instalments allowed.
+        Cycle: <span className="text-chalk">{PAYMENT_CYCLE.label}</span>. Pay,
+        then send proof with your name on WhatsApp. Admin marks you paid (or
+        regular) after that.
       </p>
 
-      <div className="mt-6 border border-flood/35 bg-black/20 px-4 py-4">
-        <p className="text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-flood">
-          Pay into
-        </p>
-        <p className="mt-2 text-lg font-semibold text-chalk">
-          {PAYMENT_ACCOUNT.accountNumber}
-        </p>
-        <p className="text-muted">
-          {PAYMENT_ACCOUNT.accountName} · {PAYMENT_ACCOUNT.bank}
-        </p>
-      </div>
+      <PaymentProofBox className="mt-6" />
 
       {error ? <p className="mt-6 text-danger">{error}</p> : null}
 
-      <h2 className="font-display mt-10 text-2xl text-chalk">This cycle</h2>
+      <h2 className="font-display mt-10 text-2xl text-chalk">
+        Registered players
+      </h2>
       <div className="mt-4 overflow-x-auto border border-line">
         <table className="w-full min-w-[36rem] text-left text-sm">
           <thead className="border-b border-flood/30 bg-black/20 text-[0.7rem] uppercase tracking-[0.12em] text-flood">
             <tr>
               <th className="px-4 py-3">Player</th>
               <th className="px-4 py-3">Paid</th>
-              <th className="px-4 py-3">Remaining</th>
-              <th className="px-4 py-3">Seat</th>
+              <th className="px-4 py-3">Still owing</th>
             </tr>
           </thead>
           <tbody>
             {summary.length === 0 ? (
               <tr>
-                <td colSpan={4} className="px-4 py-8 text-muted">
-                  No payments this cycle yet.
+                <td colSpan={3} className="px-4 py-8 text-muted">
+                  No registered payments yet — mark players paid in Admin after
+                  they register.
                 </td>
               </tr>
             ) : (
               summary.map((row) => (
                 <tr key={row.playerId} className="border-b border-line">
                   <td className="px-4 py-3 font-semibold text-chalk">
-                    {row.name}
+                    <Link
+                      href={`/players/${row.playerId}`}
+                      className="hover:text-flood"
+                    >
+                      {row.name}
+                    </Link>
                     {row.isInstalment ? (
-                      <span className="ml-2 text-xs text-flood">instalment</span>
+                      <span className="ml-2 text-xs text-flood">partial</span>
                     ) : null}
                   </td>
-                  <td className="px-4 py-3 text-flood">{formatNaira(row.total)}</td>
-                  <td className="px-4 py-3 text-muted">
-                    {row.remaining > 0 ? formatNaira(row.remaining) : "—"}
+                  <td className="px-4 py-3 text-flood">
+                    {formatNaira(row.total)}
                   </td>
-                  <td className="px-4 py-3 capitalize text-muted">{row.seat}</td>
+                  <td className="px-4 py-3 text-muted">
+                    {row.remaining > 0 ? formatNaira(row.remaining) : "Cleared"}
+                  </td>
                 </tr>
               ))
             )}
           </tbody>
         </table>
       </div>
+
+      <h2 className="font-display mt-10 text-2xl text-chalk">
+        On-field / unregistered
+      </h2>
+      <p className="mt-2 text-sm text-muted">
+        Cash paid by people who have not registered yet.
+      </p>
+      <ul className="mt-4 border-t border-line">
+        {walkIns.length === 0 ? (
+          <li className="py-4 text-muted">None logged.</li>
+        ) : (
+          walkIns.map((w) => (
+            <li
+              key={w.id}
+              className="flex justify-between gap-3 border-b border-line py-3 text-sm"
+            >
+              <span className="text-chalk">
+                {w.name}
+                {w.note ? (
+                  <span className="text-muted"> · {w.note}</span>
+                ) : null}
+              </span>
+              <span className="text-flood">{formatNaira(w.amount)}</span>
+            </li>
+          ))
+        )}
+      </ul>
 
       <h2 className="font-display mt-10 text-2xl text-chalk">Payment log</h2>
       <div className="mt-4 overflow-x-auto border border-line">
@@ -111,25 +149,35 @@ export function PaymentsClient() {
             </tr>
           </thead>
           <tbody>
-            {payments.map((p) => (
-              <tr key={p.id} className="border-b border-line">
-                <td className="px-4 py-3 font-semibold text-chalk">
-                  {p.player.name}
-                </td>
-                <td className="px-4 py-3 text-muted">
-                  {p.type === "MONTHLY_INSTALMENT"
-                    ? "Instalment"
-                    : p.type === "MONTHLY_5K"
-                      ? "Monthly"
-                      : "Visitor"}
-                </td>
-                <td className="px-4 py-3 text-flood">{formatNaira(p.amount)}</td>
-                <td className="px-4 py-3 text-muted">{p.note ?? "—"}</td>
-                <td className="px-4 py-3 text-muted">
-                  {new Date(p.paidAt).toLocaleDateString()}
+            {payments.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="px-4 py-8 text-muted">
+                  Empty until you mark payments in Admin.
                 </td>
               </tr>
-            ))}
+            ) : (
+              payments.map((p) => (
+                <tr key={p.id} className="border-b border-line">
+                  <td className="px-4 py-3 font-semibold text-chalk">
+                    {p.player.name}
+                  </td>
+                  <td className="px-4 py-3 text-muted">
+                    {p.type === "MONTHLY_INSTALMENT"
+                      ? "Partial / instalment"
+                      : p.type === "MONTHLY_5K"
+                        ? "Full monthly"
+                        : "Visitor"}
+                  </td>
+                  <td className="px-4 py-3 text-flood">
+                    {formatNaira(p.amount)}
+                  </td>
+                  <td className="px-4 py-3 text-muted">{p.note ?? "—"}</td>
+                  <td className="px-4 py-3 text-muted">
+                    {new Date(p.paidAt).toLocaleDateString()}
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>

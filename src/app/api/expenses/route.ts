@@ -3,26 +3,30 @@ import { requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export async function GET() {
-  const [payments, expenses, ledger] = await Promise.all([
+  const [payments, expenses, ledger, walkIns] = await Promise.all([
     prisma.payment.findMany({ orderBy: { paidAt: "desc" } }),
     prisma.expense.findMany({ orderBy: { spentAt: "desc" } }),
     prisma.purseLedger.findMany({ orderBy: { createdAt: "desc" } }),
+    prisma.walkInPayment.findMany({ orderBy: { paidAt: "desc" } }),
   ]);
 
   const feesIn = payments.reduce((sum, p) => sum + p.amount, 0);
+  const walkInIn = walkIns.reduce((sum, p) => sum + p.amount, 0);
   const ledgerIn = ledger.reduce((sum, e) => sum + e.amount, 0);
   const spent = expenses.reduce((sum, e) => sum + e.amount, 0);
-  const income = feesIn + ledgerIn;
+  const income = feesIn + ledgerIn + walkInIn;
 
   return NextResponse.json({
     income,
     feesIn,
+    walkInIn,
     ledgerIn,
     spent,
     balance: income - spent,
     payments,
     expenses,
     ledger,
+    walkIns,
   });
 }
 

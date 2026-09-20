@@ -4,19 +4,25 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AppChrome, formatNaira } from "@/components/AppChrome";
+import { PaymentProofBox } from "@/components/PaymentProofBox";
 
 type Dashboard = {
   monthKey: string;
   player: {
+    id: string;
     name: string;
     phone: string;
     status: string;
     seat: string;
+    photoPath?: string | null;
+    isAdmin?: boolean;
     team: { name: string; number: number } | null;
   };
   payment: {
     paidThisMonth: boolean;
     permanentPaid: boolean;
+    paidTotal?: number;
+    remaining?: number;
     payments: { type: string; amount: number; paidAt: string }[];
   };
   stats: {
@@ -91,6 +97,55 @@ export function MeClient() {
             </p>
           ) : null}
 
+          <div className="flex flex-wrap items-start gap-6">
+            <div className="size-24 overflow-hidden border border-line bg-black/30">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={
+                  data.player.photoPath
+                    ? `/api/avatars/${data.player.id}?t=${encodeURIComponent(data.player.photoPath)}`
+                    : "data:image/svg+xml," +
+                      encodeURIComponent(
+                        `<svg xmlns='http://www.w3.org/2000/svg' width='96' height='96'><rect fill='#0c281c' width='100%' height='100%'/><text x='50%' y='54%' fill='#9aafa2' text-anchor='middle' font-size='24'>${data.player.name.slice(0, 1)}</text></svg>`,
+                      )
+                }
+                alt=""
+                className="size-full object-cover"
+              />
+            </div>
+            <form
+              className="flex flex-wrap items-center gap-2"
+              onSubmit={async (e) => {
+                e.preventDefault();
+                const form = e.currentTarget;
+                const fd = new FormData(form);
+                const res = await fetch(`/api/players/${data.player.id}`, {
+                  method: "POST",
+                  body: fd,
+                });
+                if (res.ok) {
+                  const player = await res.json();
+                  setData({ ...data, player: { ...data.player, ...player } });
+                  form.reset();
+                }
+              }}
+            >
+              <input type="file" name="photo" accept="image/*" required className="text-sm text-muted" />
+              <button
+                type="submit"
+                className="bg-flood px-3 py-2 text-xs font-semibold uppercase tracking-[0.08em] text-pitch-deep"
+              >
+                Upload photo
+              </button>
+              <Link
+                href={`/players/${data.player.id}`}
+                className="text-sm text-flood hover:underline"
+              >
+                Public profile
+              </Link>
+            </form>
+          </div>
+
           <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <InfoCard label="Name" value={data.player.name} />
             <InfoCard label="Phone" value={data.player.phone} />
@@ -108,13 +163,29 @@ export function MeClient() {
             <h2 className="font-display text-2xl text-chalk">
               Payment · {data.monthKey}
             </h2>
-            <p className="mt-2 text-muted">
-              {data.payment.paidThisMonth
-                ? data.payment.permanentPaid
-                  ? "Paid ₦5,000 this month — permanent seat."
-                  : "Paid this month (visitor / sub)."
-                : "No payment logged for this month yet."}
-            </p>
+            {data.player.isAdmin ? (
+              <p className="mt-2 text-muted">
+                You can mark yourself paid in Admin. Your row stays off the
+                public payments board.
+              </p>
+            ) : (
+              <p className="mt-2 text-muted">
+                {data.payment.paidThisMonth
+                  ? data.payment.permanentPaid
+                    ? `Paid in full (${formatNaira(data.payment.paidTotal ?? 5000)}) — regular seat.`
+                    : `Partial: ${formatNaira(data.payment.paidTotal ?? 0)} paid${
+                        data.payment.remaining
+                          ? ` · ${formatNaira(data.payment.remaining)} remaining`
+                          : ""
+                      }.`
+                  : data.player.seat === "permanent"
+                    ? "Marked as regular — still send proof of payment on WhatsApp so admin can log it."
+                    : "No payment logged yet. Pay, then send proof with your name on WhatsApp."}
+              </p>
+            )}
+            {!data.payment.paidThisMonth && !data.player.isAdmin ? (
+              <PaymentProofBox className="mt-4" />
+            ) : null}
             <ul className="mt-4 border-t border-line">
               {data.payment.payments.length === 0 ? (
                 <li className="py-4 text-muted">Nothing recorded.</li>
@@ -127,7 +198,9 @@ export function MeClient() {
                     <span className="text-chalk">
                       {p.type === "MONTHLY_5K"
                         ? "Monthly ₦5k"
-                        : "Visitor ₦1.5k"}
+                        : p.type === "MONTHLY_INSTALMENT"
+                          ? "Instalment"
+                          : "Visitor ₦1.5k"}
                     </span>
                     <span className="text-flood">
                       {formatNaira(p.amount)} ·{" "}

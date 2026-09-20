@@ -8,12 +8,14 @@ datasource db {
 }
 
 model Team {
-  id        String   @id @default(cuid())
-  number    Int      @unique
-  name      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  players   Player[]
+  id           String        @id @default(cuid())
+  number       Int           @unique
+  name         String
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  players      Player[]
+  homeResults  MatchResult[] @relation("HomeTeam")
+  awayResults  MatchResult[] @relation("AwayTeam")
 }
 
 model Player {
@@ -24,6 +26,7 @@ model Player {
   status       String       @default("pending") // pending | active
   seat         String       @default("sub") // permanent | sub
   isAdmin      Boolean      @default(false)
+  photoPath    String?
   teamId       String?
   team         Team?        @relation(fields: [teamId], references: [id])
   createdAt    DateTime     @default(now())
@@ -40,7 +43,7 @@ model Payment {
   id        String   @id @default(cuid())
   playerId  String
   player    Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
-  monthKey  String // e.g. 2026-09-cycle
+  monthKey  String
   type      String // MONTHLY_5K | MONTHLY_INSTALMENT | VISITOR_1_5K
   amount    Int
   note      String?
@@ -51,6 +54,19 @@ model Payment {
   @@index([playerId])
 }
 
+/** Cash / on-field payments from people not yet registered. */
+model WalkInPayment {
+  id        String   @id @default(cuid())
+  name      String
+  amount    Int
+  monthKey  String
+  note      String?
+  paidAt    DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  @@index([monthKey])
+}
+
 model MatchEvent {
   id        String   @id @default(cuid())
   playerId  String
@@ -58,12 +74,31 @@ model MatchEvent {
   monthKey  String
   week      Int
   match     Int
-  type      String // GOAL | ASSIST | YC | RC
+  type      String
   count     Int      @default(1)
   createdAt DateTime @default(now())
 
   @@index([monthKey])
   @@index([playerId])
+}
+
+/** Final score for a scheduled fixture (league table). */
+model MatchResult {
+  id         String   @id @default(cuid())
+  monthKey   String
+  week       Int
+  match      Int
+  homeTeamId String
+  awayTeamId String
+  homeTeam   Team     @relation("HomeTeam", fields: [homeTeamId], references: [id])
+  awayTeam   Team     @relation("AwayTeam", fields: [awayTeamId], references: [id])
+  homeGoals  Int
+  awayGoals  Int
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([monthKey, week, match])
+  @@index([monthKey])
 }
 
 model Expense {
@@ -77,7 +112,7 @@ model Expense {
 
 model PurseLedger {
   id        String   @id @default(cuid())
-  kind      String // CARRYOVER | ADJUSTMENT
+  kind      String
   title     String
   amount    Int
   note      String?
@@ -86,12 +121,12 @@ model PurseLedger {
 
 model Feedback {
   id        String   @id @default(cuid())
-  type      String // suggestion | complaint
+  type      String
   message   String
   name      String?
   playerId  String?
   player    Player?  @relation(fields: [playerId], references: [id], onDelete: SetNull)
-  status    String   @default("new") // new | read | resolved
+  status    String   @default("new")
   createdAt DateTime @default(now())
 
   @@index([status])

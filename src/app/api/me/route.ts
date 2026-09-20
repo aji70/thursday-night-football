@@ -46,8 +46,9 @@ export async function GET(request: Request) {
     if (event.type === "RC") rc += event.count;
   }
 
-  const paidThisMonth = payments.length > 0;
-  const permanentPaid = payments.some((p) => p.type === "MONTHLY_5K");
+  const paidTotal = payments.reduce((s, p) => s + p.amount, 0);
+  const paidThisMonth = paidTotal > 0;
+  const permanentPaid = paidTotal >= PAYMENT_CYCLE.monthlyFee;
 
   return NextResponse.json({
     monthKey,
@@ -55,6 +56,8 @@ export async function GET(request: Request) {
     payment: {
       paidThisMonth,
       permanentPaid,
+      paidTotal,
+      remaining: Math.max(0, PAYMENT_CYCLE.monthlyFee - paidTotal),
       payments,
     },
     stats: {

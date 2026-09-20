@@ -13,7 +13,10 @@ export async function GET(request: Request) {
   const monthKey = searchParams.get("month") || PAYMENT_CYCLE.key;
 
   const payments = await prisma.payment.findMany({
-    where: { monthKey },
+    where: {
+      monthKey,
+      player: { isAdmin: false },
+    },
     include: { player: { include: { team: true } } },
     orderBy: { paidAt: "desc" },
   });

@@ -18,6 +18,14 @@ export const PAYMENT_ACCOUNT = {
   accountName: "Sabo Ajidokwu Emmanuel",
 } as const;
 
+/** Proof of payment — WhatsApp group + admin number. */
+export const WHATSAPP = {
+  groupName: "Thursday night football",
+  groupUrl: "https://chat.whatsapp.com/J4xHyWSX88F5mjrh3oRm0H",
+  adminPhone: "08060332714",
+  adminChatUrl: "https://wa.me/2348060332714",
+} as const;
+
 export const PAYMENT_AMOUNTS = {
   MONTHLY_5K: 5000,
   MONTHLY_INSTALMENT: 0, // amount supplied by admin

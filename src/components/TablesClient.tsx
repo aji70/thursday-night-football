@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { AppChrome } from "@/components/AppChrome";
 import type { PlayerStatRow } from "@/lib/league-db";
+import type { StandingRow } from "@/lib/standings";
 
 type StatsPayload = {
   monthKey: string;
@@ -15,28 +16,95 @@ type StatsPayload = {
 type Tab = "goals" | "assists" | "cards" | "overall";
 
 export function TablesClient() {
+  const [standings, setStandings] = useState<StandingRow[]>([]);
+  const [monthKey, setMonthKey] = useState("");
   const [data, setData] = useState<StatsPayload | null>(null);
   const [tab, setTab] = useState<Tab>("goals");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/stats")
-      .then((r) => r.json())
-      .then(setData)
+    Promise.all([fetch("/api/results"), fetch("/api/stats")])
+      .then(async ([rRes, sRes]) => {
+        const rData = await rRes.json();
+        const sData = await sRes.json();
+        setStandings(rData.standings ?? []);
+        setMonthKey(rData.monthKey || sData.monthKey || "");
+        setData(sData);
+      })
       .catch(() => setError("Could not load tables"));
   }, []);
 
   const rows = data?.[tab] ?? [];
 
   return (
-    <AppChrome title="Monthly tables">
+    <AppChrome title="Tables">
       <p className="text-muted">
-        Goals, assists, cards, and overall for{" "}
-        <span className="text-chalk">{data?.monthKey ?? "…"}</span>. Overall =
-        goals + assists − (0.5 × yellows) − reds.
+        League standings and player charts for{" "}
+        <span className="text-chalk">{monthKey || "…"}</span>. Tiebreakers: points
+        → clean sheets → GD → GF → head-to-head → discipline.
       </p>
 
-      <div className="mt-6 flex flex-wrap gap-2">
+      {error ? <p className="mt-6 text-danger">{error}</p> : null}
+
+      <h2 className="font-display mt-10 text-2xl text-chalk">League table</h2>
+      <div className="mt-4 overflow-x-auto border border-line">
+        <table className="w-full min-w-[44rem] text-left text-sm">
+          <thead className="border-b border-flood/30 bg-black/20 text-[0.7rem] uppercase tracking-[0.12em] text-flood">
+            <tr>
+              <th className="px-3 py-3">#</th>
+              <th className="px-3 py-3">Team</th>
+              <th className="px-3 py-3">P</th>
+              <th className="px-3 py-3">W</th>
+              <th className="px-3 py-3">D</th>
+              <th className="px-3 py-3">L</th>
+              <th className="px-3 py-3">GF</th>
+              <th className="px-3 py-3">GA</th>
+              <th className="px-3 py-3">GD</th>
+              <th className="px-3 py-3">CS</th>
+              <th className="px-3 py-3">Pts</th>
+            </tr>
+          </thead>
+          <tbody>
+            {standings.length === 0 ? (
+              <tr>
+                <td colSpan={11} className="px-4 py-8 text-muted">
+                  No teams yet.
+                </td>
+              </tr>
+            ) : (
+              standings.map((row, i) => (
+                <tr key={row.teamId} className="border-b border-line">
+                  <td className="px-3 py-3 font-display text-flood">{i + 1}</td>
+                  <td className="px-3 py-3 font-semibold text-chalk">
+                    {row.name}
+                  </td>
+                  <td className="px-3 py-3 text-muted">{row.played}</td>
+                  <td className="px-3 py-3 text-muted">{row.won}</td>
+                  <td className="px-3 py-3 text-muted">{row.drawn}</td>
+                  <td className="px-3 py-3 text-muted">{row.lost}</td>
+                  <td className="px-3 py-3 text-muted">{row.gf}</td>
+                  <td className="px-3 py-3 text-muted">{row.ga}</td>
+                  <td className="px-3 py-3 text-muted">
+                    {row.gd > 0 ? `+${row.gd}` : row.gd}
+                  </td>
+                  <td className="px-3 py-3 text-muted">{row.cleanSheets}</td>
+                  <td className="px-3 py-3 font-semibold text-flood">
+                    {row.points}
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+      {standings.every((r) => r.played === 0) ? (
+        <p className="mt-3 text-sm text-muted">
+          Scores appear after admin logs match results.
+        </p>
+      ) : null}
+
+      <h2 className="font-display mt-14 text-2xl text-chalk">Player charts</h2>
+      <div className="mt-4 flex flex-wrap gap-2">
         {(
           [
             ["goals", "Goals"],
@@ -60,9 +128,7 @@ export function TablesClient() {
         ))}
       </div>
 
-      {error ? <p className="mt-6 text-danger">{error}</p> : null}
-
-      <div className="mt-6 overflow-x-auto border border-line">
+      <div className="mt-4 overflow-x-auto border border-line">
         <table className="w-full min-w-[36rem] text-left text-sm">
           <thead className="border-b border-flood/30 bg-black/20 text-[0.7rem] uppercase tracking-[0.12em] text-flood">
             <tr>
@@ -87,8 +153,12 @@ export function TablesClient() {
               rows.map((row, i) => (
                 <tr key={row.playerId} className="border-b border-line">
                   <td className="px-4 py-3 font-display text-flood">{i + 1}</td>
-                  <td className="px-4 py-3 font-semibold text-chalk">{row.name}</td>
-                  <td className="px-4 py-3 text-muted">{row.teamName ?? "—"}</td>
+                  <td className="px-4 py-3 font-semibold text-chalk">
+                    {row.name}
+                  </td>
+                  <td className="px-4 py-3 text-muted">
+                    {row.teamName ?? "—"}
+                  </td>
                   <td className="px-4 py-3">{row.goals}</td>
                   <td className="px-4 py-3">{row.assists}</td>
                   <td className="px-4 py-3">{row.yc}</td>

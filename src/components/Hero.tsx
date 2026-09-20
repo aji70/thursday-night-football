@@ -1,6 +1,25 @@
+"use client";
+
+import Link from "next/link";
 import Image from "next/image";
+import { useEffect, useState } from "react";
 
 export function Hero() {
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [name, setName] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/auth/login")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.player) {
+          setLoggedIn(true);
+          setName(data.player.name?.split(" ")[0] ?? null);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   return (
     <section
       id="top"
@@ -32,18 +51,33 @@ export function Hero() {
           player a proper night on the pitch.
         </p>
         <div className="no-print mt-8 flex flex-wrap gap-3">
-          <a
-            href="#fixtures"
-            className="bg-flood px-5 py-3 text-sm font-semibold tracking-wide text-pitch-deep transition hover:bg-flood-soft"
-          >
-            See the fixtures
-          </a>
-          <a
-            href="#why"
+          {loggedIn ? (
+            <Link
+              href="/me"
+              className="bg-flood px-5 py-3 text-sm font-semibold tracking-wide text-pitch-deep transition hover:bg-flood-soft"
+            >
+              {name ? `My profile · ${name}` : "My profile"}
+            </Link>
+          ) : (
+            <Link
+              href="/register"
+              className="bg-flood px-5 py-3 text-sm font-semibold tracking-wide text-pitch-deep transition hover:bg-flood-soft"
+            >
+              Register to play
+            </Link>
+          )}
+          <Link
+            href="/rules"
             className="border border-chalk/30 px-5 py-3 text-sm font-semibold tracking-wide text-chalk transition hover:border-flood hover:text-flood"
           >
-            Read the proposal
-          </a>
+            Read the rules
+          </Link>
+          <Link
+            href="/tables"
+            className="border border-chalk/30 px-5 py-3 text-sm font-semibold tracking-wide text-chalk transition hover:border-flood hover:text-flood"
+          >
+            League table
+          </Link>
         </div>
       </div>
     </section>

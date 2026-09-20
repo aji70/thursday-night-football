@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AppChrome } from "@/components/AppChrome";
+import { PlayerAvatar } from "@/components/PlayerAvatar";
 
 type PlayerRow = {
   id: string;
   name: string;
   phone: string;
   status: string;
-  seat: string;
+  photoPath?: string | null;
   team: { name: string } | null;
 };
 
@@ -56,24 +57,34 @@ export function PlayersClient() {
               <th className="px-4 py-3">Name</th>
               <th className="px-4 py-3">Phone</th>
               <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Seat</th>
               <th className="px-4 py-3">Team</th>
             </tr>
           </thead>
           <tbody>
             {players.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-muted">
+                <td colSpan={4} className="px-4 py-8 text-muted">
                   No players found.
                 </td>
               </tr>
             ) : (
               players.map((p) => (
                 <tr key={p.id} className="border-b border-line">
-                  <td className="px-4 py-3 font-semibold text-chalk">{p.name}</td>
+                  <td className="px-4 py-3 font-semibold text-chalk">
+                    <Link
+                      href={`/players/${p.id}`}
+                      className="inline-flex items-center gap-3 hover:text-flood"
+                    >
+                      <PlayerAvatar
+                        id={p.id}
+                        name={p.name}
+                        photoPath={p.photoPath}
+                      />
+                      {p.name}
+                    </Link>
+                  </td>
                   <td className="px-4 py-3 text-muted">{p.phone}</td>
                   <td className="px-4 py-3 capitalize text-muted">{p.status}</td>
-                  <td className="px-4 py-3 capitalize text-muted">{p.seat}</td>
                   <td className="px-4 py-3 text-muted">
                     {p.team?.name ?? "—"}
                   </td>

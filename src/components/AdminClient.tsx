@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { formatNaira } from "@/components/AppChrome";
+import { fixturesByWeek } from "@/data/league";
 
 type Team = {
   id: string;
@@ -17,6 +18,7 @@ type Player = {
   phone: string | null;
   status: string;
   seat: string;
+  isAdmin?: boolean;
   teamId: string | null;
   team?: { id: string; name: string; number: number } | null;
 };
@@ -30,6 +32,16 @@ type EventRow = {
   player: { name: string };
 };
 
+type MatchResultRow = {
+  id: string;
+  week: number;
+  match: number;
+  homeGoals: number;
+  awayGoals: number;
+  homeTeam: { name: string; number: number };
+  awayTeam: { name: string; number: number };
+};
+
 type Expense = {
   id: string;
   title: string;
@@ -39,7 +51,7 @@ type Expense = {
 };
 
 const field =
-  "border border-line bg-transparent px-3 py-2 text-sm text-chalk outline-none focus:border-flood";
+  "select-field border border-line bg-pitch-lift px-3 py-2 text-sm text-chalk outline-none focus:border-flood";
 const label =
   "grid gap-1.5 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-muted";
 
@@ -50,6 +62,7 @@ export function AdminClient() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [events, setEvents] = useState<EventRow[]>([]);
+  const [results, setResults] = useState<MatchResultRow[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [balance, setBalance] = useState(0);
   const [feedback, setFeedback] = useState<
@@ -66,10 +79,11 @@ export function AdminClient() {
   const [message, setMessage] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    const [pRes, tRes, eRes, xRes, fRes] = await Promise.all([
+    const [pRes, tRes, eRes, rRes, xRes, fRes] = await Promise.all([
       fetch("/api/players"),
       fetch("/api/teams"),
       fetch("/api/events"),
+      fetch("/api/results"),
       fetch("/api/expenses"),
       fetch("/api/feedback"),
     ]);
@@ -77,6 +91,8 @@ export function AdminClient() {
     setTeams(await tRes.json());
     const eventData = await eRes.json();
     setEvents(eventData.events ?? []);
+    const resultData = await rRes.json();
+    setResults(resultData.results ?? []);
     const purse = await xRes.json();
     setExpenses(purse.expenses ?? []);
     setBalance(purse.balance ?? 0);
@@ -228,21 +244,46 @@ export function AdminClient() {
                     <span className="text-muted"> · {p.phone}</span>
                   ) : null}
                 </span>
-                <button
-                  type="button"
-                  className="bg-flood px-3 py-1.5 text-xs font-semibold text-pitch-deep"
-                  onClick={async () => {
-                    await fetch("/api/players", {
-                      method: "PATCH",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ id: p.id, status: "active" }),
-                    });
-                    flash(`Approved ${p.name}`);
-                    await refresh();
-                  }}
-                >
-                  Approve
-                </button>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    className="bg-flood px-3 py-1.5 text-xs font-semibold text-pitch-deep"
+                    onClick={async () => {
+                      await fetch("/api/players", {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          id: p.id,
+                          status: "active",
+                          seat: "permanent",
+                        }),
+                      });
+                      flash(`Approved ${p.name} as regular`);
+                      await refresh();
+                    }}
+                  >
+                    Approve as regular
+                  </button>
+                  <button
+                    type="button"
+                    className="border border-line px-3 py-1.5 text-xs font-semibold text-muted"
+                    onClick={async () => {
+                      await fetch("/api/players", {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          id: p.id,
+                          status: "active",
+                          seat: "sub",
+                        }),
+                      });
+                      flash(`Approved ${p.name} as sub`);
+                      await refresh();
+                    }}
+                  >
+                    Approve as sub
+                  </button>
+                </div>
               </li>
             ))
           )}
@@ -251,7 +292,102 @@ export function AdminClient() {
 
       <section className="mt-12 border-t border-line pt-8">
         <h2 className="font-display text-2xl text-chalk">Mark payment</h2>
-        <PaymentForm players={active} onDone={async () => { flash("Payment logged"); await refresh(); }} />
+        <p className="mt-2 text-sm text-muted">
+          Log full ₦5,000 or a partial amount — including yourself. Player
+          payment status on the public board still excludes admin.
+        </p>
+        <PaymentForm
+          players={active}
+          onDone={async () => {
+            flash("Payment logged");
+            await refresh();
+          }}
+        />
+      </section>
+
+      <section className="mt-12 border-t border-line pt-8">
+        <h2 className="font-display text-2xl text-chalk">
+          Mark as regular (before pay)
+        </h2>
+        <p className="mt-2 max-w-2xl text-sm text-muted">
+          Set a permanent / regular seat even if payment is not logged yet.
+          Tell them to send proof with their name to WhatsApp.
+        </p>
+        <ul className="mt-4 space-y-2">
+          {active.length === 0 ? (
+            <li className="text-muted">No active players.</li>
+          ) : (
+            active.map((p) => (
+              <li
+                key={p.id}
+                className="flex flex-wrap items-center justify-between gap-3 border-b border-line py-3 text-sm"
+              >
+                <span className="text-chalk">
+                  {p.name}
+                  <span className="text-muted">
+                    {" "}
+                    · {p.seat === "permanent" ? "regular" : "sub"}
+                    {p.isAdmin ? " · admin" : ""}
+                  </span>
+                </span>
+                <div className="flex gap-2">
+                  {p.seat !== "permanent" ? (
+                    <button
+                      type="button"
+                      className="bg-flood px-3 py-1.5 text-xs font-semibold text-pitch-deep"
+                      onClick={async () => {
+                        await fetch("/api/players", {
+                          method: "PATCH",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            id: p.id,
+                            seat: "permanent",
+                            status: "active",
+                          }),
+                        });
+                        flash(`${p.name} → regular`);
+                        await refresh();
+                      }}
+                    >
+                      Make regular
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="border border-line px-3 py-1.5 text-xs font-semibold text-muted"
+                      onClick={async () => {
+                        await fetch("/api/players", {
+                          method: "PATCH",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ id: p.id, seat: "sub" }),
+                        });
+                        flash(`${p.name} → sub`);
+                        await refresh();
+                      }}
+                    >
+                      Make sub
+                    </button>
+                  )}
+                </div>
+              </li>
+            ))
+          )}
+        </ul>
+      </section>
+
+      <section className="mt-12 border-t border-line pt-8">
+        <h2 className="font-display text-2xl text-chalk">
+          On-field / unregistered payment
+        </h2>
+        <p className="mt-2 text-sm text-muted">
+          Cash from someone who has not created a profile yet.
+        </p>
+        <WalkInForm
+          onDone={async () => {
+            flash("Walk-in payment logged");
+            await refresh();
+          }}
+        />
       </section>
 
       <section className="mt-12 border-t border-line pt-8">
@@ -307,6 +443,47 @@ export function AdminClient() {
             />
           ))}
         </div>
+      </section>
+
+      <section className="mt-12 border-t border-line pt-8">
+        <h2 className="font-display text-2xl text-chalk">Log match result</h2>
+        <p className="mt-2 max-w-2xl text-sm text-muted">
+          Enter the final score for a fixture. This feeds the league table on
+          Tables.
+        </p>
+        <ResultForm
+          onDone={async () => {
+            flash("Result saved");
+            await refresh();
+          }}
+        />
+        <ul className="mt-6 max-h-48 overflow-y-auto border-t border-line">
+          {results.length === 0 ? (
+            <li className="py-3 text-sm text-muted">No results yet.</li>
+          ) : (
+            results.map((r) => (
+              <li
+                key={r.id}
+                className="flex items-center justify-between gap-3 border-b border-line py-2 text-sm"
+              >
+                <span className="text-muted">
+                  W{r.week} M{r.match} · {r.homeTeam.name} {r.homeGoals}–
+                  {r.awayGoals} {r.awayTeam.name}
+                </span>
+                <button
+                  type="button"
+                  className="text-xs text-danger"
+                  onClick={async () => {
+                    await fetch(`/api/results?id=${r.id}`, { method: "DELETE" });
+                    await refresh();
+                  }}
+                >
+                  Remove
+                </button>
+              </li>
+            ))
+          )}
+        </ul>
       </section>
 
       <section className="mt-12 border-t border-line pt-8">
@@ -443,6 +620,55 @@ export function AdminClient() {
         </ul>
       </section>
     </div>
+  );
+}
+
+function WalkInForm({ onDone }: { onDone: () => Promise<void> }) {
+  return (
+    <form
+      className="mt-4 grid max-w-3xl gap-3 sm:grid-cols-[1fr_7rem_1fr_auto]"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.currentTarget);
+        await fetch("/api/walk-ins", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: fd.get("name"),
+            amount: Number(fd.get("amount")),
+            note: fd.get("note") || undefined,
+          }),
+        });
+        e.currentTarget.reset();
+        await onDone();
+      }}
+    >
+      <input
+        name="name"
+        placeholder="Name on the night"
+        className={field}
+        required
+      />
+      <input
+        name="amount"
+        type="number"
+        min={1}
+        placeholder="₦"
+        className={field}
+        required
+      />
+      <input
+        name="note"
+        placeholder="Note (optional)"
+        className={field}
+      />
+      <button
+        type="submit"
+        className="bg-flood px-4 py-2 text-sm font-semibold text-pitch-deep"
+      >
+        Log
+      </button>
+    </form>
   );
 }
 
@@ -625,6 +851,92 @@ function TeamDraftCard({
       </form>
     </article>
   );
+}
+
+function ResultForm({ onDone }: { onDone: () => Promise<void> }) {
+  const [week, setWeek] = useState("1");
+  const [match, setMatch] = useState("1");
+  const label =
+    fixtureLabel(Number(week), Number(match)) ?? "Select fixture";
+
+  return (
+    <form
+      className="mt-4 grid max-w-3xl gap-3 sm:grid-cols-[auto_auto_1fr_5rem_5rem_auto]"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.currentTarget);
+        await fetch("/api/results", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            week: Number(fd.get("week")),
+            match: Number(fd.get("match")),
+            homeGoals: Number(fd.get("homeGoals")),
+            awayGoals: Number(fd.get("awayGoals")),
+          }),
+        });
+        e.currentTarget.reset();
+        setWeek("1");
+        setMatch("1");
+        await onDone();
+      }}
+    >
+      <select
+        name="week"
+        className={field}
+        required
+        value={week}
+        onChange={(e) => setWeek(e.target.value)}
+      >
+        {[1, 2, 3, 4].map((w) => (
+          <option key={w} value={w}>
+            Week {w}
+          </option>
+        ))}
+      </select>
+      <select
+        name="match"
+        className={field}
+        required
+        value={match}
+        onChange={(e) => setMatch(e.target.value)}
+      >
+        {[1, 2, 3, 4, 5, 6].map((m) => (
+          <option key={m} value={m}>
+            Match {m}
+          </option>
+        ))}
+      </select>
+      <p className="flex items-center text-sm text-chalk">{label}</p>
+      <input
+        name="homeGoals"
+        type="number"
+        min={0}
+        placeholder="Home"
+        className={field}
+        required
+      />
+      <input
+        name="awayGoals"
+        type="number"
+        min={0}
+        placeholder="Away"
+        className={field}
+        required
+      />
+      <button
+        type="submit"
+        className="bg-flood px-3 text-sm font-semibold text-pitch-deep"
+      >
+        Save
+      </button>
+    </form>
+  );
+}
+
+function fixtureLabel(week: number, match: number) {
+  const w = week as 1 | 2 | 3 | 4;
+  return fixturesByWeek[w]?.find((f) => f.match === match)?.fixture ?? null;
 }
 
 function EventForm({
