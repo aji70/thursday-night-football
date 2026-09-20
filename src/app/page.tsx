@@ -3,11 +3,11 @@ import { SiteHeader } from "@/components/SiteHeader";
 
 export default function HomePage() {
   return (
-    <div className="h-dvh overflow-hidden">
+    <>
       <SiteHeader />
-      <main className="h-full">
+      <main>
         <Hero />
       </main>
-    </div>
+    </>
   );
 }
