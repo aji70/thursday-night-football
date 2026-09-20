@@ -50,6 +50,15 @@ type Expense = {
   spentAt: string;
 };
 
+type PaymentRow = {
+  id: string;
+  type: string;
+  amount: number;
+  note: string | null;
+  paidAt: string;
+  player: { id: string; name: string };
+};
+
 const field =
   "select-field border border-line bg-pitch-lift px-3 py-2 text-sm text-chalk outline-none focus:border-flood";
 const label =
@@ -63,6 +72,7 @@ export function AdminClient() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [events, setEvents] = useState<EventRow[]>([]);
   const [results, setResults] = useState<MatchResultRow[]>([]);
+  const [payments, setPayments] = useState<PaymentRow[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [balance, setBalance] = useState(0);
   const [feedback, setFeedback] = useState<
@@ -79,11 +89,12 @@ export function AdminClient() {
   const [message, setMessage] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    const [pRes, tRes, eRes, rRes, xRes, fRes] = await Promise.all([
+    const [pRes, tRes, eRes, rRes, payRes, xRes, fRes] = await Promise.all([
       fetch("/api/players"),
       fetch("/api/teams"),
       fetch("/api/events"),
       fetch("/api/results"),
+      fetch("/api/payments"),
       fetch("/api/expenses"),
       fetch("/api/feedback"),
     ]);
@@ -93,6 +104,8 @@ export function AdminClient() {
     setEvents(eventData.events ?? []);
     const resultData = await rRes.json();
     setResults(resultData.results ?? []);
+    const payData = await payRes.json();
+    setPayments(payData.payments ?? []);
     const purse = await xRes.json();
     setExpenses(purse.expenses ?? []);
     setBalance(purse.balance ?? 0);
@@ -300,6 +313,13 @@ export function AdminClient() {
           players={active}
           onDone={async () => {
             flash("Payment logged");
+            await refresh();
+          }}
+        />
+        <PaymentEditList
+          payments={payments}
+          onDone={async (msg) => {
+            flash(msg);
             await refresh();
           }}
         />
@@ -669,6 +689,154 @@ function WalkInForm({ onDone }: { onDone: () => Promise<void> }) {
         Log
       </button>
     </form>
+  );
+}
+
+function PaymentEditList({
+  payments,
+  onDone,
+}: {
+  payments: PaymentRow[];
+  onDone: (msg: string) => Promise<void>;
+}) {
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [amount, setAmount] = useState("");
+  const [type, setType] = useState<
+    "MONTHLY_5K" | "MONTHLY_INSTALMENT" | "VISITOR_1_5K"
+  >("MONTHLY_INSTALMENT");
+
+  return (
+    <div className="mt-8">
+      <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-flood">
+        Edit / remove logged payments
+      </h3>
+      <p className="mt-1 text-sm text-muted">
+        Fix mistakes here — e.g. change ₦5,000 to ₦3,000 and set type to
+        Instalment.
+      </p>
+      <ul className="mt-4 max-h-80 overflow-y-auto border-t border-line">
+        {payments.length === 0 ? (
+          <li className="py-3 text-sm text-muted">No payments logged yet.</li>
+        ) : (
+          payments.map((p) => (
+            <li
+              key={p.id}
+              className="border-b border-line py-3 text-sm"
+            >
+              {editingId === p.id ? (
+                <form
+                  className="grid gap-2 sm:grid-cols-[1fr_auto_7rem_auto_auto]"
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    const res = await fetch("/api/payments", {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        id: p.id,
+                        amount: Number(amount),
+                        type,
+                        note:
+                          type === "MONTHLY_INSTALMENT"
+                            ? "Instalment"
+                            : type === "MONTHLY_5K"
+                              ? null
+                              : p.note,
+                      }),
+                    });
+                    if (!res.ok) return;
+                    setEditingId(null);
+                    await onDone(`Updated ${p.player.name}`);
+                  }}
+                >
+                  <span className="flex items-center text-chalk">
+                    {p.player.name}
+                  </span>
+                  <select
+                    className={field}
+                    value={type}
+                    onChange={(e) =>
+                      setType(e.target.value as typeof type)
+                    }
+                  >
+                    <option value="MONTHLY_5K">Full monthly</option>
+                    <option value="MONTHLY_INSTALMENT">Instalment</option>
+                    <option value="VISITOR_1_5K">Visitor</option>
+                  </select>
+                  <input
+                    className={field}
+                    type="number"
+                    min={1}
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    required
+                  />
+                  <button
+                    type="submit"
+                    className="bg-flood px-3 py-2 text-xs font-semibold text-pitch-deep"
+                  >
+                    Save
+                  </button>
+                  <button
+                    type="button"
+                    className="border border-line px-3 py-2 text-xs text-muted"
+                    onClick={() => setEditingId(null)}
+                  >
+                    Cancel
+                  </button>
+                </form>
+              ) : (
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <span className="text-muted">
+                    <span className="text-chalk">{p.player.name}</span>
+                    {" · "}
+                    {formatNaira(p.amount)}
+                    {" · "}
+                    {p.type === "MONTHLY_INSTALMENT"
+                      ? "Instalment"
+                      : p.type === "MONTHLY_5K"
+                        ? "Full monthly"
+                        : "Visitor"}
+                    {p.note ? ` · ${p.note}` : ""}
+                  </span>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      className="border border-line px-3 py-1.5 text-xs font-semibold text-muted"
+                      onClick={() => {
+                        setEditingId(p.id);
+                        setAmount(String(p.amount));
+                        setType(
+                          p.type as
+                            | "MONTHLY_5K"
+                            | "MONTHLY_INSTALMENT"
+                            | "VISITOR_1_5K",
+                        );
+                      }}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      className="text-xs text-danger"
+                      onClick={async () => {
+                        if (!confirm(`Delete payment for ${p.player.name}?`))
+                          return;
+                        await fetch(`/api/payments?id=${p.id}`, {
+                          method: "DELETE",
+                        });
+                        await onDone(`Removed payment for ${p.player.name}`);
+                      }}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              )}
+            </li>
+          ))
+        )}
+      </ul>
+    </div>
   );
 }
 

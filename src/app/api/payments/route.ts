@@ -150,3 +150,120 @@ export async function POST(request: Request) {
 
   return NextResponse.json(payment, { status: 201 });
 }
+
+async function syncSeatForPlayer(playerId: string, monthKey: string) {
+  const total = await prisma.payment.aggregate({
+    where: {
+      playerId,
+      monthKey,
+      type: { in: ["MONTHLY_5K", "MONTHLY_INSTALMENT", "VISITOR_1_5K"] },
+    },
+    _sum: { amount: true },
+  });
+  const sum = total._sum.amount || 0;
+  const visitorOnly = await prisma.payment.count({
+    where: { playerId, monthKey, type: "VISITOR_1_5K" },
+  });
+  const monthly = await prisma.payment.count({
+    where: {
+      playerId,
+      monthKey,
+      type: { in: ["MONTHLY_5K", "MONTHLY_INSTALMENT"] },
+    },
+  });
+
+  let seat: "permanent" | "sub" = "sub";
+  if (monthly > 0 && sum >= PAYMENT_CYCLE.monthlyFee) seat = "permanent";
+  else if (monthly > 0 && sum > 0 && sum < PAYMENT_CYCLE.monthlyFee) {
+    // Partial monthly — keep permanent if already marked regular, else sub
+    const player = await prisma.player.findUnique({
+      where: { id: playerId },
+      select: { seat: true },
+    });
+    seat = player?.seat === "permanent" ? "permanent" : "sub";
+  } else if (visitorOnly > 0 && monthly === 0) seat = "sub";
+
+  await prisma.player.update({
+    where: { id: playerId },
+    data: { seat },
+  });
+}
+
+export async function PATCH(request: Request) {
+  try {
+    await requireAdmin();
+  } catch {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const body = (await request.json()) as {
+    id?: string;
+    amount?: number;
+    type?: PaymentType;
+    note?: string | null;
+  };
+
+  if (!body.id) {
+    return NextResponse.json({ error: "id required" }, { status: 400 });
+  }
+
+  const existing = await prisma.payment.findUnique({ where: { id: body.id } });
+  if (!existing) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  const amount =
+    body.amount !== undefined ? Math.round(Number(body.amount)) : existing.amount;
+  if (!amount || amount <= 0) {
+    return NextResponse.json({ error: "Positive amount required" }, { status: 400 });
+  }
+
+  const type =
+    body.type && body.type in PAYMENT_AMOUNTS ? body.type : existing.type;
+
+  const payment = await prisma.payment.update({
+    where: { id: body.id },
+    data: {
+      amount,
+      type,
+      note:
+        body.note === undefined
+          ? undefined
+          : body.note?.trim() ||
+            (type === "MONTHLY_INSTALMENT" ? "Instalment" : null),
+    },
+    include: {
+      player: {
+        select: { id: true, name: true, seat: true },
+      },
+    },
+  });
+
+  await syncSeatForPlayer(payment.playerId, payment.monthKey);
+
+  return NextResponse.json(payment);
+}
+
+export async function DELETE(request: Request) {
+  try {
+    await requireAdmin();
+  } catch {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { searchParams } = new URL(request.url);
+  const id = searchParams.get("id");
+  if (!id) {
+    return NextResponse.json({ error: "id required" }, { status: 400 });
+  }
+
+  const existing = await prisma.payment.findUnique({ where: { id } });
+  if (!existing) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  await prisma.payment.delete({ where: { id } });
+  await syncSeatForPlayer(existing.playerId, existing.monthKey);
+
+  return NextResponse.json({ ok: true });
+}
