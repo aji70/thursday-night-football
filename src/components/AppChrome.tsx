@@ -11,7 +11,7 @@ export function AppChrome({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen">
+    <div>
       <header className="sticky top-0 z-40 border-b border-line bg-pitch-deep/95 backdrop-blur-sm">
         <div className="section-shell flex h-14 items-center justify-between gap-4 sm:h-16">
           <Link
