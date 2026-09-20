@@ -296,6 +296,30 @@ export function AdminClient() {
                   >
                     Approve as sub
                   </button>
+                  <button
+                    type="button"
+                    className="text-xs text-danger"
+                    onClick={async () => {
+                      if (
+                        !confirm(
+                          `Delete ${p.name}? Their profile and related payments/events will be removed.`,
+                        )
+                      )
+                        return;
+                      const res = await fetch(`/api/players?id=${p.id}`, {
+                        method: "DELETE",
+                      });
+                      if (!res.ok) {
+                        const err = await res.json().catch(() => ({}));
+                        flash(err.error || "Could not delete");
+                        return;
+                      }
+                      flash(`Deleted ${p.name}`);
+                      await refresh();
+                    }}
+                  >
+                    Delete
+                  </button>
                 </div>
               </li>
             ))
@@ -389,6 +413,32 @@ export function AdminClient() {
                       Make sub
                     </button>
                   )}
+                  {!p.isAdmin ? (
+                    <button
+                      type="button"
+                      className="text-xs text-danger"
+                      onClick={async () => {
+                        if (
+                          !confirm(
+                            `Delete ${p.name}? Their profile and related payments/events will be removed.`,
+                          )
+                        )
+                          return;
+                        const res = await fetch(`/api/players?id=${p.id}`, {
+                          method: "DELETE",
+                        });
+                        if (!res.ok) {
+                          const err = await res.json().catch(() => ({}));
+                          flash(err.error || "Could not delete");
+                          return;
+                        }
+                        flash(`Deleted ${p.name}`);
+                        await refresh();
+                      }}
+                    >
+                      Delete
+                    </button>
+                  ) : null}
                 </div>
               </li>
             ))

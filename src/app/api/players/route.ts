@@ -124,3 +124,36 @@ export async function PATCH(request: Request) {
 
   return NextResponse.json(publicPlayer(player));
 }
+
+export async function DELETE(request: Request) {
+  try {
+    await requireAdmin();
+  } catch {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { searchParams } = new URL(request.url);
+  const id = searchParams.get("id");
+  if (!id) {
+    return NextResponse.json({ error: "id required" }, { status: 400 });
+  }
+
+  const player = await prisma.player.findUnique({
+    where: { id },
+    select: { id: true, name: true, isAdmin: true },
+  });
+
+  if (!player) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  if (player.isAdmin) {
+    return NextResponse.json(
+      { error: "Cannot delete the admin account" },
+      { status: 400 },
+    );
+  }
+
+  await prisma.player.delete({ where: { id } });
+  return NextResponse.json({ ok: true, name: player.name });
+}
