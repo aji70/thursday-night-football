@@ -12,44 +12,48 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const monthKey = searchParams.get("month") || PAYMENT_CYCLE.key;
 
-  const payments = await prisma.payment.findMany({
-    where: {
-      monthKey,
-      player: { isAdmin: false },
-    },
-    include: { player: { include: { team: true } } },
-    orderBy: { paidAt: "desc" },
+  const [payments, players] = await Promise.all([
+    prisma.payment.findMany({
+      where: { monthKey },
+      include: { player: { include: { team: true } } },
+      orderBy: { paidAt: "desc" },
+    }),
+    prisma.player.findMany({
+      where: { status: "active" },
+      orderBy: { name: "asc" },
+    }),
+  ]);
+
+  const totals = new Map<string, number>();
+  for (const p of payments) {
+    totals.set(p.playerId, (totals.get(p.playerId) || 0) + p.amount);
+  }
+
+  const summary = players.map((player) => {
+    const total = totals.get(player.id) || 0;
+    return {
+      playerId: player.id,
+      name: player.name,
+      total,
+      seat: player.seat,
+      remaining: Math.max(0, PAYMENT_CYCLE.monthlyFee - total),
+      isInstalment: total > 0 && total < PAYMENT_CYCLE.monthlyFee,
+      isPaid: total >= PAYMENT_CYCLE.monthlyFee,
+    };
   });
 
-  const byPlayer = new Map<
-    string,
-    { name: string; total: number; seat: string; entries: typeof payments }
-  >();
-
-  for (const p of payments) {
-    const row = byPlayer.get(p.playerId) ?? {
-      name: p.player.name,
-      total: 0,
-      seat: p.player.seat,
-      entries: [],
-    };
-    row.total += p.amount;
-    row.entries.push(p);
-    byPlayer.set(p.playerId, row);
-  }
+  // Paid first, then partial, then unpaid — so already-paid players are visible.
+  summary.sort((a, b) => {
+    if (a.isPaid !== b.isPaid) return a.isPaid ? -1 : 1;
+    if (a.isInstalment !== b.isInstalment) return a.isInstalment ? -1 : 1;
+    return a.name.localeCompare(b.name);
+  });
 
   return NextResponse.json({
     monthKey,
     cycle: PAYMENT_CYCLE,
     payments,
-    summary: Array.from(byPlayer.entries()).map(([playerId, row]) => ({
-      playerId,
-      name: row.name,
-      total: row.total,
-      seat: row.seat,
-      remaining: Math.max(0, PAYMENT_CYCLE.monthlyFee - row.total),
-      isInstalment: row.total > 0 && row.total < PAYMENT_CYCLE.monthlyFee,
-    })),
+    summary,
   });
 }
 

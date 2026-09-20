@@ -22,6 +22,7 @@ type SummaryRow = {
   seat: string;
   remaining: number;
   isInstalment: boolean;
+  isPaid?: boolean;
 };
 
 type WalkIn = {
@@ -92,9 +93,13 @@ export function PaymentsClient() {
                     >
                       {row.name}
                     </Link>
-                    {row.isInstalment ? (
+                    {row.isPaid ? (
+                      <span className="ml-2 text-xs text-flood">paid</span>
+                    ) : row.isInstalment ? (
                       <span className="ml-2 text-xs text-flood">partial</span>
-                    ) : null}
+                    ) : (
+                      <span className="ml-2 text-xs text-muted">unpaid</span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-flood">
                     {formatNaira(row.total)}
