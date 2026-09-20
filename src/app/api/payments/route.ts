@@ -15,7 +15,21 @@ export async function GET(request: Request) {
   const [payments, players] = await Promise.all([
     prisma.payment.findMany({
       where: { monthKey },
-      include: { player: { include: { team: true } } },
+      include: {
+        player: {
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+            status: true,
+            seat: true,
+            isAdmin: true,
+            photoPath: true,
+            teamId: true,
+            team: true,
+          },
+        },
+      },
       orderBy: { paidAt: "desc" },
     }),
     prisma.player.findMany({
