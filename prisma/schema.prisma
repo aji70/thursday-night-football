@@ -1,0 +1,74 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Team {
+  id        String   @id @default(cuid())
+  number    Int      @unique
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  players   Player[]
+}
+
+model Player {
+  id           String       @id @default(cuid())
+  name         String
+  phone        String       @unique
+  passwordHash String
+  status       String       @default("pending") // pending | active
+  seat         String       @default("sub") // permanent | sub
+  teamId       String?
+  team         Team?        @relation(fields: [teamId], references: [id])
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  payments     Payment[]
+  events       MatchEvent[]
+
+  @@index([name])
+  @@index([status])
+}
+
+model Payment {
+  id        String   @id @default(cuid())
+  playerId  String
+  player    Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  monthKey  String // e.g. 2026-09
+  type      String // MONTHLY_5K | VISITOR_1_5K
+  amount    Int
+  note      String?
+  paidAt    DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  @@index([monthKey])
+  @@index([playerId])
+}
+
+model MatchEvent {
+  id        String   @id @default(cuid())
+  playerId  String
+  player    Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  monthKey  String
+  week      Int
+  match     Int
+  type      String // GOAL | ASSIST | YC | RC
+  count     Int      @default(1)
+  createdAt DateTime @default(now())
+
+  @@index([monthKey])
+  @@index([playerId])
+}
+
+model Expense {
+  id        String   @id @default(cuid())
+  title     String
+  amount    Int
+  note      String?
+  spentAt   DateTime @default(now())
+  createdAt DateTime @default(now())
+}
