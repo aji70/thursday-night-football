@@ -55,7 +55,6 @@ export function Hero() {
       })
       .catch(() => {});
 
-    // News API lands with NewsPost — until then keep the empty-state card.
     fetch("/api/news?limit=1")
       .then(async (r) => {
         if (!r.ok) return null;
@@ -80,7 +79,7 @@ export function Hero() {
   return (
     <section
       id="top"
-      className="relative isolate overflow-hidden"
+      className="relative isolate flex h-dvh max-h-dvh flex-col overflow-hidden"
       aria-label="Thursday Night Football"
     >
       <div className="absolute inset-0 -z-10">
@@ -103,13 +102,13 @@ export function Hero() {
           className="absolute inset-0"
           style={{
             background:
-              "linear-gradient(to top, rgba(6,21,15,0.88) 0%, rgba(6,21,15,0.35) 42%, rgba(6,21,15,0.45) 100%)",
+              "linear-gradient(to top, rgba(6,21,15,0.75) 0%, rgba(6,21,15,0.25) 45%, rgba(6,21,15,0.5) 100%)",
           }}
         />
       </div>
 
-      <div className="section-shell relative flex flex-col gap-8 pt-[4.75rem] pb-8 sm:gap-9 sm:pt-[5.25rem] sm:pb-9">
-        <div className="hero-copy max-w-3xl">
+      <div className="section-shell relative flex min-h-0 flex-1 flex-col pt-[4.75rem] pb-5 sm:pt-[5.25rem] sm:pb-6">
+        <div className="hero-copy max-w-3xl shrink-0">
           <p className="font-display print-ink text-[clamp(2.35rem,7.5vw,4.25rem)] leading-[0.9] tracking-[0.04em] text-chalk drop-shadow-[0_2px_14px_rgba(6,21,15,0.7)]">
             Thursday Night Football
           </p>
@@ -162,8 +161,8 @@ export function Hero() {
           </div>
         </div>
 
-        {/* News + next fixture — two cards only */}
-        <div className="no-print grid w-full max-w-3xl grid-cols-1 gap-3 sm:grid-cols-2">
+        {/* Sit on the bottom edge of the viewport — kills the dead band below */}
+        <div className="no-print mt-auto grid w-full max-w-3xl grid-cols-1 gap-3 pt-8 sm:grid-cols-2">
           {news ? (
             <Link href={`/news/${news.id}`} className={stripCardClass}>
               <p className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-flood">
