@@ -50,7 +50,7 @@ export function Hero() {
   return (
     <section
       id="top"
-      className="relative isolate min-h-[72svh] overflow-hidden sm:min-h-[78svh]"
+      className="relative isolate overflow-hidden"
       aria-label="Thursday Night Football"
     >
       <div className="absolute inset-0 -z-10">
@@ -78,7 +78,7 @@ export function Hero() {
         />
       </div>
 
-      <div className="section-shell relative flex min-h-[72svh] flex-col justify-between gap-10 pt-[4.75rem] pb-10 sm:min-h-[78svh] sm:pt-[5.25rem] sm:pb-12">
+      <div className="section-shell relative flex flex-col gap-8 pt-[4.75rem] pb-8 sm:gap-10 sm:pt-[5.25rem] sm:pb-10">
         <div className="hero-copy max-w-3xl">
           <p className="font-display print-ink text-[clamp(2.35rem,7.5vw,4.25rem)] leading-[0.9] tracking-[0.04em] text-chalk drop-shadow-[0_2px_14px_rgba(6,21,15,0.7)]">
             Thursday Night Football
