@@ -109,6 +109,7 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "id required" }, { status: 400 });
   }
 
+  // isAdmin is sole-owner only — never set via this API (seed grants Aji).
   const player = await prisma.player.update({
     where: { id: body.id },
     data: {

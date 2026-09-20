@@ -79,6 +79,20 @@ export function AdminClient() {
       });
   }, [refresh]);
 
+  // If not password-authed, check player session — sole admin can open /admin after login.
+  useEffect(() => {
+    if (authed) return;
+    fetch("/api/auth/login")
+      .then((r) => r.json())
+      .then(async (data) => {
+        if (data.player?.isAdmin && data.player?.status === "active") {
+          setAuthed(true);
+          await refresh();
+        }
+      })
+      .catch(() => {});
+  }, [authed, refresh]);
+
   async function login(e: FormEvent) {
     e.preventDefault();
     setLoginError(null);
@@ -116,8 +130,23 @@ export function AdminClient() {
         <Link href="/" className="font-display text-xl tracking-[0.12em] text-flood">
           TNF
         </Link>
-        <h1 className="font-display mt-8 text-3xl text-chalk">Admin login</h1>
-        <form onSubmit={login} className="mt-6 max-w-sm space-y-4">
+        <h1 className="font-display mt-8 text-3xl text-chalk">Admin</h1>
+        <p className="mt-3 max-w-md text-muted">
+          Log in with your player profile (Aji) for admin access, or use the
+          emergency password.
+        </p>
+        <p className="mt-4">
+          <Link
+            href="/login"
+            className="bg-flood px-4 py-2.5 text-sm font-semibold text-pitch-deep"
+          >
+            Player login
+          </Link>
+        </p>
+        <form onSubmit={login} className="mt-10 max-w-sm space-y-4 border-t border-line pt-8">
+          <p className="text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-muted">
+            Emergency password
+          </p>
           <label className={label}>
             Password
             <input
@@ -130,9 +159,9 @@ export function AdminClient() {
           </label>
           <button
             type="submit"
-            className="bg-flood px-4 py-2.5 text-sm font-semibold text-pitch-deep"
+            className="border border-line px-4 py-2.5 text-sm font-semibold text-muted"
           >
-            Sign in
+            Sign in with password
           </button>
           {loginError ? <p className="text-danger">{loginError}</p> : null}
         </form>

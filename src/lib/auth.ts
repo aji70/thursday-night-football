@@ -1,5 +1,6 @@
 import { createHmac, randomBytes, scryptSync, timingSafeEqual } from "crypto";
 import { cookies } from "next/headers";
+import { prisma } from "@/lib/prisma";
 
 const ADMIN_COOKIE = "tnf_admin";
 const PLAYER_COOKIE = "tnf_player";
@@ -65,7 +66,7 @@ export async function clearAdminSession() {
   jar.delete(ADMIN_COOKIE);
 }
 
-export async function isAdminAuthenticated() {
+export async function isPasswordAdminAuthenticated() {
   const jar = await cookies();
   const value = jar.get(ADMIN_COOKIE)?.value;
   if (!value) return false;
@@ -78,6 +79,39 @@ export async function isAdminAuthenticated() {
   } catch {
     return false;
   }
+}
+
+export async function getPlayerIdFromSession() {
+  const jar = await cookies();
+  const value = jar.get(PLAYER_COOKIE)?.value;
+  if (!value) return null;
+  const [playerId, token] = value.split(".");
+  if (!playerId || !token) return null;
+  const expected = playerTokenFor(playerId);
+  try {
+    const a = Buffer.from(token);
+    const b = Buffer.from(expected);
+    if (a.length !== b.length) return null;
+    if (!timingSafeEqual(a, b)) return null;
+    return playerId;
+  } catch {
+    return null;
+  }
+}
+
+/** True if password-admin cookie OR logged-in player with isAdmin. */
+export async function isAdminAuthenticated() {
+  if (await isPasswordAdminAuthenticated()) return true;
+
+  const playerId = await getPlayerIdFromSession();
+  if (!playerId) return false;
+
+  const player = await prisma.player.findUnique({
+    where: { id: playerId },
+    select: { isAdmin: true, status: true },
+  });
+
+  return !!player?.isAdmin && player.status === "active";
 }
 
 export async function requireAdmin() {
@@ -99,24 +133,6 @@ export async function setPlayerSession(playerId: string) {
 export async function clearPlayerSession() {
   const jar = await cookies();
   jar.delete(PLAYER_COOKIE);
-}
-
-export async function getPlayerIdFromSession() {
-  const jar = await cookies();
-  const value = jar.get(PLAYER_COOKIE)?.value;
-  if (!value) return null;
-  const [playerId, token] = value.split(".");
-  if (!playerId || !token) return null;
-  const expected = playerTokenFor(playerId);
-  try {
-    const a = Buffer.from(token);
-    const b = Buffer.from(expected);
-    if (a.length !== b.length) return null;
-    if (!timingSafeEqual(a, b)) return null;
-    return playerId;
-  } catch {
-    return null;
-  }
 }
 
 export async function requirePlayer() {
