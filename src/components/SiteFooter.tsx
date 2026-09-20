@@ -1,13 +1,14 @@
 export function SiteFooter() {
+  const year = new Date().getFullYear();
+
   return (
-    <footer className="border-t border-line bg-pitch-deep py-8 text-center">
+    <footer className="border-t border-line bg-pitch-deep py-6 text-center">
       <div className="section-shell">
-        <p className="font-display print-ink text-lg tracking-[0.06em] text-chalk sm:text-xl">
-          Thursday Night Football — League System & Disciplinary Framework
+        <p className="text-xs tracking-[0.04em] text-muted">
+          Thursday Night Football · League system & disciplinary framework
         </p>
-        <p className="print-muted mt-2 text-sm text-muted">
-          Internal squad review. Living document — rules can change after each
-          four-week cycle.
+        <p className="mt-1.5 text-xs text-muted/80">
+          Internal squad review · Living document · © {year}
         </p>
       </div>
     </footer>
