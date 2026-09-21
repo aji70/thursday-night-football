@@ -6,7 +6,7 @@ import {
   publicPlayer,
   requireAdmin,
 } from "@/lib/auth";
-import { PAYMENT_CYCLE, attributeOverall, overallScore } from "@/lib/league-db";
+import { PAYMENT_CYCLE, overallScore } from "@/lib/league-db";
 import { prisma } from "@/lib/prisma";
 import { uploadDir } from "@/lib/uploads";
 
@@ -63,14 +63,7 @@ export async function GET(_request: Request, { params }: Params) {
           payments,
         },
     attributes: {
-      attack: player.attack,
-      midfield: player.midfield,
-      defending: player.defending,
-      overall: attributeOverall(
-        player.attack,
-        player.midfield,
-        player.defending,
-      ),
+      overall: player.overall,
     },
     stats: {
       goals,

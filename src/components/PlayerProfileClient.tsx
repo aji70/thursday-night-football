@@ -14,9 +14,7 @@ type ProfilePayload = {
     seat: string;
     isAdmin?: boolean;
     photoPath: string | null;
-    attack?: number;
-    midfield?: number;
-    defending?: number;
+    overall?: number;
     team: { name: string } | null;
   };
   monthKey: string;
@@ -25,9 +23,6 @@ type ProfilePayload = {
     remaining: number;
   } | null;
   attributes?: {
-    attack: number;
-    midfield: number;
-    defending: number;
     overall: number;
   };
   stats: {
@@ -153,32 +148,8 @@ export function PlayerProfileClient() {
           {data.attributes && data.attributes.overall > 0 ? (
             <section>
               <h2 className="font-display text-2xl text-chalk">Overall</h2>
-              <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div className="mt-4">
                 <Stat label="OVR" value={String(data.attributes.overall)} />
-                <Stat
-                  label="Attack"
-                  value={
-                    data.attributes.attack > 0
-                      ? String(data.attributes.attack)
-                      : "—"
-                  }
-                />
-                <Stat
-                  label="Midfield"
-                  value={
-                    data.attributes.midfield > 0
-                      ? String(data.attributes.midfield)
-                      : "—"
-                  }
-                />
-                <Stat
-                  label="Defending"
-                  value={
-                    data.attributes.defending > 0
-                      ? String(data.attributes.defending)
-                      : "—"
-                  }
-                />
               </div>
             </section>
           ) : null}

@@ -4,7 +4,7 @@ import {
   publicPlayer,
   requireAdmin,
 } from "@/lib/auth";
-import { clampAttr } from "@/lib/league-db";
+import { clampOverall } from "@/lib/league-db";
 import { prisma } from "@/lib/prisma";
 
 function normalizePhone(phone: string) {
@@ -104,9 +104,7 @@ export async function PATCH(request: Request) {
     teamId?: string | null;
     name?: string;
     phone?: string | null;
-    attack?: number;
-    midfield?: number;
-    defending?: number;
+    overall?: number;
   };
 
   if (!body.id) {
@@ -122,12 +120,8 @@ export async function PATCH(request: Request) {
       ...(body.teamId !== undefined ? { teamId: body.teamId } : {}),
       ...(body.name ? { name: body.name.trim() } : {}),
       ...(body.phone ? { phone: normalizePhone(body.phone) } : {}),
-      ...(body.attack !== undefined ? { attack: clampAttr(body.attack) } : {}),
-      ...(body.midfield !== undefined
-        ? { midfield: clampAttr(body.midfield) }
-        : {}),
-      ...(body.defending !== undefined
-        ? { defending: clampAttr(body.defending) }
+      ...(body.overall !== undefined
+        ? { overall: clampOverall(body.overall) }
         : {}),
     },
     include: { team: true },

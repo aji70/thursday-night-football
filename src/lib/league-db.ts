@@ -76,18 +76,7 @@ export function overallScore(
   return goals + assists - yc * 0.5 - rc;
 }
 
-/** Admin-set player card overall from attack / midfield / defending (1–99). */
-export function attributeOverall(
-  attack: number,
-  midfield: number,
-  defending: number,
-) {
-  const vals = [attack, midfield, defending].filter((n) => n > 0);
-  if (vals.length === 0) return 0;
-  return Math.round(vals.reduce((s, n) => s + n, 0) / vals.length);
-}
-
-export function clampAttr(n: unknown) {
+export function clampOverall(n: unknown) {
   const v = Math.round(Number(n));
   if (!Number.isFinite(v)) return 0;
   return Math.min(99, Math.max(0, v));

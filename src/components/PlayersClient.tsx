@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AppChrome } from "@/components/AppChrome";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
-import { attributeOverall } from "@/lib/league-db";
 
 type PlayerRow = {
   id: string;
@@ -12,9 +11,7 @@ type PlayerRow = {
   phone: string;
   status: string;
   photoPath?: string | null;
-  attack?: number;
-  midfield?: number;
-  defending?: number;
+  overall?: number;
   team: { name: string } | null;
 };
 
@@ -73,13 +70,7 @@ export function PlayersClient() {
                 </td>
               </tr>
             ) : (
-              players.map((p) => {
-                const ovr = attributeOverall(
-                  p.attack ?? 0,
-                  p.midfield ?? 0,
-                  p.defending ?? 0,
-                );
-                return (
+              players.map((p) => (
                 <tr key={p.id} className="border-b border-line">
                   <td className="px-4 py-3 font-semibold text-chalk">
                     <Link
@@ -95,7 +86,7 @@ export function PlayersClient() {
                     </Link>
                   </td>
                   <td className="px-4 py-3 text-flood">
-                    {ovr > 0 ? ovr : "—"}
+                    {p.overall && p.overall > 0 ? p.overall : "—"}
                   </td>
                   <td className="px-4 py-3 text-muted">{p.phone}</td>
                   <td className="px-4 py-3 capitalize text-muted">{p.status}</td>
@@ -103,8 +94,7 @@ export function PlayersClient() {
                     {p.team?.name ?? "—"}
                   </td>
                 </tr>
-                );
-              })
+              ))
             )}
           </tbody>
         </table>
