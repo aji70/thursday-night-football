@@ -488,9 +488,65 @@ export function AdminClient() {
       <section className="mt-12 border-t border-line pt-8">
         <h2 className="font-display text-2xl text-chalk">Draft &amp; teams</h2>
         <p className="mt-2 max-w-2xl text-sm text-muted">
-          Permanent (₦5k) players get monthly seats. Subs (₦1.5k) can be placed
-          for the night but are not locked.
+          Permanent (₦5k) players get monthly seats. Shuffle balances them by
+          Overall rating across Teams 1–4. Subs stay manual.
         </p>
+        <div className="mt-4 flex flex-wrap gap-3">
+          <button
+            type="button"
+            className="bg-flood px-4 py-2.5 text-sm font-semibold text-pitch-deep"
+            onClick={async () => {
+              if (
+                !confirm(
+                  "Shuffle all regular (permanent) players into Teams 1–4 by Overall?",
+                )
+              )
+                return;
+              const res = await fetch("/api/teams", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "shuffle" }),
+              });
+              const data = await res.json().catch(() => ({}));
+              if (!res.ok) {
+                flash(data.error || "Shuffle failed");
+                return;
+              }
+              flash(
+                `Shuffled ${data.assigned ?? 0} regulars by Overall`,
+              );
+              await refresh();
+            }}
+          >
+            Shuffle by Overall
+          </button>
+          <button
+            type="button"
+            className="border border-danger/50 px-4 py-2.5 text-sm font-semibold text-danger"
+            onClick={async () => {
+              if (
+                !confirm(
+                  "Reset all team assignments? Everyone will be unassigned.",
+                )
+              )
+                return;
+              const res = await fetch("/api/teams", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "reset" }),
+              });
+              const data = await res.json().catch(() => ({}));
+              if (!res.ok) {
+                flash(data.error || "Reset failed");
+                return;
+              }
+              flash(`Cleared ${data.cleared ?? 0} assignments`);
+              await refresh();
+            }}
+          >
+            Reset teams
+          </button>
+        </div>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <div className="border border-line p-3 text-sm">
             <p className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-flood">
@@ -1216,7 +1272,10 @@ function TeamDraftCard({
             <li key={p.id} className="flex justify-between gap-2 text-chalk">
               <span>
                 {p.name}{" "}
-                <span className="text-muted">({p.seat})</span>
+                <span className="text-muted">
+                  ({p.seat}
+                  {p.overall && p.overall > 0 ? ` · OVR ${p.overall}` : ""})
+                </span>
               </span>
               <button
                 type="button"

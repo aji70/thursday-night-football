@@ -20,6 +20,7 @@ type Dashboard = {
     seat: string;
     photoPath?: string | null;
     isAdmin?: boolean;
+    overall?: number;
     team: { name: string; number: number } | null;
   };
   nextMatch: {
@@ -200,7 +201,7 @@ export function MeClient() {
             </form>
           </div>
 
-          <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
             <InfoCard label="Name" value={data.player.name} />
             <InfoCard
               label="Team"
@@ -216,6 +217,14 @@ export function MeClient() {
               label="Seat"
               value={
                 data.player.seat === "permanent" ? "Regular" : "Visitor / sub"
+              }
+            />
+            <InfoCard
+              label="Overall"
+              value={
+                data.player.overall && data.player.overall > 0
+                  ? String(data.player.overall)
+                  : "Not rated yet"
               }
             />
             <InfoCard
@@ -269,7 +278,7 @@ export function MeClient() {
               <Stat label="Assists" value={data.stats.assists} />
               <Stat label="YC" value={data.stats.yc} />
               <Stat label="RC" value={data.stats.rc} />
-              <Stat label="Overall" value={data.stats.overall} />
+              <Stat label="Form" value={data.stats.overall} />
             </div>
           </section>
 

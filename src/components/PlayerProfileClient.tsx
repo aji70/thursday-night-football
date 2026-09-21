@@ -145,14 +145,21 @@ export function PlayerProfileClient() {
             </div>
           </div>
 
-          {data.attributes && data.attributes.overall > 0 ? (
-            <section>
-              <h2 className="font-display text-2xl text-chalk">Overall</h2>
-              <div className="mt-4">
-                <Stat label="OVR" value={String(data.attributes.overall)} />
-              </div>
-            </section>
-          ) : null}
+          <section>
+            <h2 className="font-display text-2xl text-chalk">Overall</h2>
+            <div className="mt-4">
+              <Stat
+                label="OVR"
+                value={
+                  data.attributes && data.attributes.overall > 0
+                    ? String(data.attributes.overall)
+                    : data.player.overall && data.player.overall > 0
+                      ? String(data.player.overall)
+                      : "Not rated yet"
+                }
+              />
+            </div>
+          </section>
 
           <section>
             <h2 className="font-display text-2xl text-chalk">This cycle</h2>
