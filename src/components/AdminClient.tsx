@@ -20,6 +20,9 @@ type Player = {
   seat: string;
   isAdmin?: boolean;
   teamId: string | null;
+  attack?: number;
+  midfield?: number;
+  defending?: number;
   team?: { id: string; name: string; number: number } | null;
 };
 
@@ -455,6 +458,21 @@ export function AdminClient() {
       </section>
 
       <section className="mt-12 border-t border-line pt-8">
+        <h2 className="font-display text-2xl text-chalk">Player ratings</h2>
+        <p className="mt-2 max-w-2xl text-sm text-muted">
+          Set attack, midfield, and defending (0–99). Overall is the average of
+          whatever you set. Used for balancing drafts and public profiles.
+        </p>
+        <PlayerRatingsList
+          players={active}
+          onDone={async (msg) => {
+            flash(msg);
+            await refresh();
+          }}
+        />
+      </section>
+
+      <section className="mt-12 border-t border-line pt-8">
         <h2 className="font-display text-2xl text-chalk">
           On-field / unregistered payment
         </h2>
@@ -699,6 +717,132 @@ export function AdminClient() {
         </ul>
       </section>
     </div>
+  );
+}
+
+function PlayerRatingsList({
+  players,
+  onDone,
+}: {
+  players: Player[];
+  onDone: (msg: string) => Promise<void>;
+}) {
+  if (players.length === 0) {
+    return <p className="mt-4 text-muted">No active players yet.</p>;
+  }
+
+  return (
+    <ul className="mt-4 border-t border-line">
+      {players.map((p) => (
+        <PlayerRatingRow key={p.id} player={p} onDone={onDone} />
+      ))}
+    </ul>
+  );
+}
+
+function PlayerRatingRow({
+  player,
+  onDone,
+}: {
+  player: Player;
+  onDone: (msg: string) => Promise<void>;
+}) {
+  const [attack, setAttack] = useState(String(player.attack ?? 0));
+  const [midfield, setMidfield] = useState(String(player.midfield ?? 0));
+  const [defending, setDefending] = useState(String(player.defending ?? 0));
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    setAttack(String(player.attack ?? 0));
+    setMidfield(String(player.midfield ?? 0));
+    setDefending(String(player.defending ?? 0));
+  }, [player.attack, player.midfield, player.defending]);
+
+  const a = Number(attack) || 0;
+  const m = Number(midfield) || 0;
+  const d = Number(defending) || 0;
+  const rated = [a, m, d].filter((n) => n > 0);
+  const overall =
+    rated.length === 0
+      ? "—"
+      : String(Math.round(rated.reduce((s, n) => s + n, 0) / rated.length));
+
+  return (
+    <li className="border-b border-line py-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Link
+          href={`/players/${player.id}`}
+          className="font-semibold text-chalk hover:text-flood"
+        >
+          {player.name}
+        </Link>
+        <span className="text-sm text-flood">OVR {overall}</span>
+      </div>
+      <form
+        className="mt-3 grid gap-2 sm:grid-cols-[repeat(3,minmax(0,6.5rem))_auto] sm:items-end"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          setBusy(true);
+          const res = await fetch("/api/players", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              id: player.id,
+              attack: Number(attack),
+              midfield: Number(midfield),
+              defending: Number(defending),
+            }),
+          });
+          setBusy(false);
+          if (!res.ok) {
+            await onDone("Could not save rating");
+            return;
+          }
+          await onDone(`Updated ${player.name}`);
+        }}
+      >
+        <label className={label}>
+          Attack
+          <input
+            type="number"
+            min={0}
+            max={99}
+            value={attack}
+            onChange={(e) => setAttack(e.target.value)}
+            className={field}
+          />
+        </label>
+        <label className={label}>
+          Midfield
+          <input
+            type="number"
+            min={0}
+            max={99}
+            value={midfield}
+            onChange={(e) => setMidfield(e.target.value)}
+            className={field}
+          />
+        </label>
+        <label className={label}>
+          Defending
+          <input
+            type="number"
+            min={0}
+            max={99}
+            value={defending}
+            onChange={(e) => setDefending(e.target.value)}
+            className={field}
+          />
+        </label>
+        <button
+          type="submit"
+          disabled={busy}
+          className="bg-flood px-4 py-2 text-sm font-semibold text-pitch-deep disabled:opacity-60"
+        >
+          {busy ? "Saving…" : "Save"}
+        </button>
+      </form>
+    </li>
   );
 }
 

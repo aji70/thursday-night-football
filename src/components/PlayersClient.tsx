@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AppChrome } from "@/components/AppChrome";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
+import { attributeOverall } from "@/lib/league-db";
 
 type PlayerRow = {
   id: string;
@@ -11,6 +12,9 @@ type PlayerRow = {
   phone: string;
   status: string;
   photoPath?: string | null;
+  attack?: number;
+  midfield?: number;
+  defending?: number;
   team: { name: string } | null;
 };
 
@@ -55,6 +59,7 @@ export function PlayersClient() {
           <thead className="border-b border-flood/30 bg-black/20 text-[0.7rem] uppercase tracking-[0.12em] text-flood">
             <tr>
               <th className="px-4 py-3">Name</th>
+              <th className="px-4 py-3">OVR</th>
               <th className="px-4 py-3">Phone</th>
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3">Team</th>
@@ -63,12 +68,18 @@ export function PlayersClient() {
           <tbody>
             {players.length === 0 ? (
               <tr>
-                <td colSpan={4} className="px-4 py-8 text-muted">
+                <td colSpan={5} className="px-4 py-8 text-muted">
                   No players found.
                 </td>
               </tr>
             ) : (
-              players.map((p) => (
+              players.map((p) => {
+                const ovr = attributeOverall(
+                  p.attack ?? 0,
+                  p.midfield ?? 0,
+                  p.defending ?? 0,
+                );
+                return (
                 <tr key={p.id} className="border-b border-line">
                   <td className="px-4 py-3 font-semibold text-chalk">
                     <Link
@@ -83,13 +94,17 @@ export function PlayersClient() {
                       {p.name}
                     </Link>
                   </td>
+                  <td className="px-4 py-3 text-flood">
+                    {ovr > 0 ? ovr : "—"}
+                  </td>
                   <td className="px-4 py-3 text-muted">{p.phone}</td>
                   <td className="px-4 py-3 capitalize text-muted">{p.status}</td>
                   <td className="px-4 py-3 text-muted">
                     {p.team?.name ?? "—"}
                   </td>
                 </tr>
-              ))
+                );
+              })
             )}
           </tbody>
         </table>

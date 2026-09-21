@@ -29,6 +29,10 @@ model Player {
   photoPath                   String?
   suspensionMatchesRemaining  Int          @default(0)
   suspensionReason            String?
+  /** Admin-set attributes 0–99 (0 = not rated). Overall = avg of set ratings. */
+  attack                      Int          @default(0)
+  midfield                    Int          @default(0)
+  defending                   Int          @default(0)
   teamId                      String?
   team                        Team?        @relation(fields: [teamId], references: [id])
   createdAt                   DateTime     @default(now())
