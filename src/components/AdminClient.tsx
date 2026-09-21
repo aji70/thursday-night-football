@@ -458,11 +458,18 @@ export function AdminClient() {
       <section className="mt-12 border-t border-line pt-8">
         <h2 className="font-display text-2xl text-chalk">Player ratings</h2>
         <p className="mt-2 max-w-2xl text-sm text-muted">
-          Set each player&apos;s overall (0–99). Shows on their profile and the
-          players list.
+          Set overall (0–99) for any registered player — including pending.
+          Unrated players appear first.
         </p>
         <PlayerRatingsList
-          players={active}
+          players={[...players].sort((a, b) => {
+            const ao = a.overall && a.overall > 0 ? 1 : 0;
+            const bo = b.overall && b.overall > 0 ? 1 : 0;
+            if (ao !== bo) return ao - bo;
+            if (a.status !== b.status)
+              return a.status === "pending" ? -1 : 1;
+            return a.name.localeCompare(b.name);
+          })}
           onDone={async (msg) => {
             flash(msg);
             await refresh();
@@ -810,12 +817,19 @@ function PlayerRatingRow({
 
   return (
     <li className="flex flex-wrap items-center justify-between gap-3 border-b border-line py-3">
-      <Link
-        href={`/players/${player.id}`}
-        className="font-semibold text-chalk hover:text-flood"
-      >
-        {player.name}
-      </Link>
+      <div>
+        <Link
+          href={`/players/${player.id}`}
+          className="font-semibold text-chalk hover:text-flood"
+        >
+          {player.name}
+        </Link>
+        <p className="text-xs text-muted">
+          {player.status === "pending" ? "pending" : "active"}
+          {player.seat === "permanent" ? " · regular" : " · sub"}
+          {!player.overall || player.overall <= 0 ? " · needs rating" : ""}
+        </p>
+      </div>
       <form
         className="flex items-center gap-2"
         onSubmit={async (e) => {
