@@ -104,9 +104,23 @@ select optgroup {
   animation: rise 0.85s ease-out both;
 }
 
+.news-ticker {
+  animation: news-marquee 40s linear infinite;
+}
+
+@keyframes news-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .hero-kenburns,
-  .hero-copy {
+  .hero-copy,
+  .news-ticker {
     animation: none;
   }
 }

@@ -15,12 +15,23 @@ type NextMatch = {
   opponentLabel: string;
 } | null;
 
-type NewsItem = {
+type NewsPost = {
   id: string;
   title: string;
-  summary?: string | null;
-  pinned?: boolean;
-} | null;
+  body: string;
+  pinned: boolean;
+  week: number | null;
+};
+
+type ResultRow = {
+  id: string;
+  week: number;
+  match: number;
+  homeGoals: number;
+  awayGoals: number;
+  homeTeam: { number: number; name: string };
+  awayTeam: { number: number; name: string };
+};
 
 const stripCardClass =
   "border border-chalk/20 bg-pitch-deep/95 px-4 py-3.5 shadow-[0_8px_24px_rgba(0,0,0,0.35)] backdrop-blur-md transition hover:border-flood/45";
@@ -38,8 +49,10 @@ function formatWeekDate(week: 1 | 2 | 3 | 4) {
 export function Hero() {
   const [loggedIn, setLoggedIn] = useState(false);
   const [nextMatch, setNextMatch] = useState<NextMatch>(null);
-  const [news, setNews] = useState<NewsItem>(null);
+  const [posts, setPosts] = useState<NewsPost[]>([]);
   const [newsChecked, setNewsChecked] = useState(false);
+  const [results, setResults] = useState<ResultRow[]>([]);
+  const [tickerIndex, setTickerIndex] = useState(0);
   const nextFixture = findNextFixture();
   const nextSession = findNextSession();
 
@@ -68,26 +81,40 @@ export function Hero() {
       })
       .catch(() => {});
 
-    fetch("/api/news?limit=1")
-      .then(async (r) => {
-        if (!r.ok) return null;
-        return r.json();
-      })
-      .then((data) => {
-        const post =
-          data?.posts?.[0] ?? data?.post ?? data?.items?.[0] ?? null;
-        if (post?.title) {
-          setNews({
-            id: post.id,
-            title: post.title,
-            summary: post.summary ?? post.excerpt ?? null,
-            pinned: Boolean(post.pinned),
-          });
-        }
+    Promise.all([fetch("/api/news?limit=12"), fetch("/api/results")])
+      .then(async ([nRes, rRes]) => {
+        const nData = nRes.ok ? await nRes.json() : { posts: [] };
+        const rData = rRes.ok ? await rRes.json() : { results: [] };
+        setPosts(nData.posts ?? []);
+        setResults(rData.results ?? []);
       })
       .catch(() => {})
       .finally(() => setNewsChecked(true));
   }, []);
+
+  useEffect(() => {
+    if (posts.length < 2) return;
+    const id = window.setInterval(() => {
+      setTickerIndex((i) => (i + 1) % posts.length);
+    }, 4500);
+    return () => window.clearInterval(id);
+  }, [posts.length]);
+
+  const resultKey = (week: number, match: number) =>
+    results.find((r) => r.week === week && r.match === match);
+
+  const latestWeekResults = (() => {
+    if (results.length === 0) return [];
+    const week = Math.max(...results.map((r) => r.week));
+    return results
+      .filter((r) => r.week === week)
+      .sort((a, b) => a.match - b.match);
+  })();
+
+  const featured = posts[tickerIndex] ?? posts[0] ?? null;
+  const latestResult = [...results].sort(
+    (a, b) => b.week - a.week || b.match - a.match,
+  )[0];
 
   return (
     <>
@@ -161,10 +188,10 @@ export function Hero() {
                 </Link>
               )}
               <Link
-                href="/rules"
+                href="/news"
                 className="border border-chalk/35 bg-pitch-deep/40 px-5 py-3 text-sm font-semibold tracking-wide text-chalk backdrop-blur-[2px] transition hover:border-flood hover:text-flood"
               >
-                Read the rules
+                News
               </Link>
               <Link
                 href="/tables"
@@ -175,20 +202,28 @@ export function Hero() {
             </div>
           </div>
 
+          {/* Rotating news + next fixture / latest result */}
           <div className="no-print grid w-full max-w-3xl grid-cols-1 gap-3 sm:grid-cols-2">
-            {news ? (
-              <Link href={`/news/${news.id}`} className={stripCardClass}>
+            {featured ? (
+              <Link
+                href={`/news/${featured.id}`}
+                className={`${stripCardClass} min-h-[6.5rem]`}
+              >
                 <p className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-flood">
-                  {news.pinned ? "Pinned" : "Latest"}
+                  {featured.pinned ? "Pinned" : "News"}
+                  {posts.length > 1
+                    ? ` · ${tickerIndex + 1}/${posts.length}`
+                    : ""}
                 </p>
-                <p className="mt-1.5 font-semibold leading-snug text-chalk">
-                  {news.title}
+                <p
+                  key={featured.id}
+                  className="mt-1.5 font-semibold leading-snug text-chalk transition-opacity duration-500"
+                >
+                  {featured.title}
                 </p>
-                {news.summary ? (
-                  <p className="mt-1.5 line-clamp-2 text-sm text-muted">
-                    {news.summary}
-                  </p>
-                ) : null}
+                <p className="mt-1.5 line-clamp-2 text-sm text-muted">
+                  {featured.body.split("\n").find((l) => l.trim()) ?? ""}
+                </p>
               </Link>
             ) : (
               <div className={stripCardClass}>
@@ -203,7 +238,25 @@ export function Hero() {
               </div>
             )}
 
-            {nextFixture ? (
+            {latestResult ? (
+              <Link href="#results" className={stripCardClass}>
+                <p className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-flood">
+                  Latest result · W{latestResult.week} M{latestResult.match}
+                </p>
+                <p className="mt-1.5 font-semibold leading-snug text-chalk">
+                  {latestResult.homeTeam.name}{" "}
+                  <span className="text-flood">
+                    {latestResult.homeGoals}–{latestResult.awayGoals}
+                  </span>{" "}
+                  {latestResult.awayTeam.name}
+                </p>
+                <p className="mt-1.5 text-sm text-muted">
+                  {nextFixture
+                    ? `Next: ${nextFixture.fixture} · ${nextFixture.dateLabel}`
+                    : "See all results below"}
+                </p>
+              </Link>
+            ) : nextFixture ? (
               <a href="#fixtures" className={stripCardClass}>
                 <p className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-flood">
                   Next fixture
@@ -218,10 +271,10 @@ export function Hero() {
             ) : (
               <div className={stripCardClass}>
                 <p className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-flood">
-                  Next fixture
+                  Fixtures
                 </p>
                 <p className="mt-1.5 text-sm text-muted">
-                  Check back after Matchday 1
+                  Check back for upcoming matches.
                 </p>
               </div>
             )}
@@ -229,9 +282,85 @@ export function Hero() {
         </div>
       </section>
 
+      {/* Scrolling news ticker */}
+      {posts.length > 0 ? (
+        <div className="no-print overflow-hidden border-y border-line bg-black/40">
+          <div className="flex items-center gap-3 px-3 py-2.5 sm:px-6">
+            <Link
+              href="/news"
+              className="shrink-0 text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-flood"
+            >
+              News
+            </Link>
+            <div className="relative min-w-0 flex-1 overflow-hidden">
+              <div className="news-ticker flex w-max gap-10 whitespace-nowrap text-sm text-chalk">
+                {[...posts, ...posts].map((p, i) => (
+                  <Link
+                    key={`${p.id}-${i}`}
+                    href={`/news/${p.id}`}
+                    className="hover:text-flood"
+                  >
+                    <span className="text-flood">◆</span> {p.title}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Results */}
+      <section
+        id="results"
+        className="border-t border-line bg-pitch-deep py-10 sm:py-12"
+      >
+        <div className="section-shell">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-flood">
+                Results
+              </p>
+              <h2 className="font-display mt-1 text-2xl text-chalk sm:text-3xl">
+                {latestWeekResults.length
+                  ? `Week ${latestWeekResults[0].week}`
+                  : "No results yet"}
+              </h2>
+            </div>
+            <Link href="/tables" className="text-sm text-flood hover:underline">
+              League table
+            </Link>
+          </div>
+
+          {latestWeekResults.length === 0 ? (
+            <p className="mt-6 text-muted">
+              Scores appear here after each matchday is logged.
+            </p>
+          ) : (
+            <ul className="mt-6 divide-y divide-line border border-line">
+              {latestWeekResults.map((r) => (
+                <li
+                  key={r.id}
+                  className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
+                >
+                  <span className="text-sm text-muted">Match {r.match}</span>
+                  <span className="font-semibold text-chalk">
+                    {r.homeTeam.name}{" "}
+                    <span className="text-flood">
+                      {r.homeGoals}–{r.awayGoals}
+                    </span>{" "}
+                    {r.awayTeam.name}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </section>
+
+      {/* Fixtures */}
       <section
         id="fixtures"
-        className="border-t border-line bg-pitch-deep py-10 sm:py-12"
+        className="border-t border-line bg-pitch py-10 sm:py-12"
       >
         <div className="section-shell">
           <div className="flex flex-wrap items-end justify-between gap-3">
@@ -255,30 +384,38 @@ export function Hero() {
 
           {nextSession ? (
             <ul className="mt-6 divide-y divide-line border border-line">
-              {nextSession.fixtures.map((row) => (
-                <li
-                  key={row.match}
-                  className="grid grid-cols-[3rem_1fr_auto] items-center gap-3 px-4 py-3 sm:grid-cols-[4rem_8rem_1fr_8rem]"
-                >
-                  <span className="font-display text-lg text-flood">
-                    {row.match}
-                  </span>
-                  <span className="hidden text-sm text-muted sm:block">
-                    {row.time}
-                  </span>
-                  <span className="font-semibold text-chalk">{row.fixture}</span>
-                  <span className="text-right text-xs text-muted sm:text-sm">
-                    <span className="sm:hidden">{row.time}</span>
-                    <span className="hidden sm:inline">
-                      Panel {row.officiating}
+              {nextSession.fixtures.map((row) => {
+                const played = resultKey(nextSession.week, row.match);
+                return (
+                  <li
+                    key={row.match}
+                    className="grid grid-cols-[3rem_1fr_auto] items-center gap-3 px-4 py-3 sm:grid-cols-[4rem_8rem_1fr_auto]"
+                  >
+                    <span className="font-display text-lg text-flood">
+                      {row.match}
                     </span>
-                  </span>
-                </li>
-              ))}
+                    <span className="hidden text-sm text-muted sm:block">
+                      {row.time}
+                    </span>
+                    <span className="font-semibold text-chalk">
+                      {row.fixture}
+                    </span>
+                    <span className="text-right text-sm">
+                      {played ? (
+                        <span className="text-flood">
+                          {played.homeGoals}–{played.awayGoals}
+                        </span>
+                      ) : (
+                        <span className="text-muted sm:hidden">{row.time}</span>
+                      )}
+                    </span>
+                  </li>
+                );
+              })}
             </ul>
           ) : (
             <p className="mt-6 text-muted">
-              Check back after Matchday 1 — fixtures will show here.
+              No upcoming matchday left in this cycle.
             </p>
           )}
 
@@ -293,18 +430,25 @@ export function Hero() {
                     </p>
                   </div>
                   <ul className="divide-y divide-line">
-                    {fixturesByWeek[week].map((row) => (
-                      <li
-                        key={row.match}
-                        className="flex items-baseline justify-between gap-3 px-4 py-2.5 text-sm"
-                      >
-                        <span className="text-chalk">
-                          <span className="text-flood">{row.match}.</span>{" "}
-                          {row.fixture}
-                        </span>
-                        <span className="shrink-0 text-muted">{row.time}</span>
-                      </li>
-                    ))}
+                    {fixturesByWeek[week].map((row) => {
+                      const played = resultKey(week, row.match);
+                      return (
+                        <li
+                          key={row.match}
+                          className="flex items-baseline justify-between gap-3 px-4 py-2.5 text-sm"
+                        >
+                          <span className="text-chalk">
+                            <span className="text-flood">{row.match}.</span>{" "}
+                            {row.fixture}
+                          </span>
+                          <span className="shrink-0 text-muted">
+                            {played
+                              ? `${played.homeGoals}–${played.awayGoals}`
+                              : row.time}
+                          </span>
+                        </li>
+                      );
+                    })}
                   </ul>
                 </div>
               ))}
