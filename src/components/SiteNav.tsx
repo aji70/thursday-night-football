@@ -16,6 +16,7 @@ type AuthPlayer = {
 
 const pageLinks = [
   { href: "/", label: "Home" },
+  { href: "/news", label: "News" },
   { href: "/rules", label: "Rules" },
   { href: "/tables", label: "Tables" },
   { href: "/players", label: "Players" },
