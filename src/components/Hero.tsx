@@ -340,16 +340,13 @@ export function Hero() {
               {latestWeekResults.map((r) => (
                 <li
                   key={r.id}
-                  className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
+                  className="px-4 py-3 text-center font-semibold text-chalk"
                 >
-                  <span className="text-sm text-muted">Match {r.match}</span>
-                  <span className="font-semibold text-chalk">
-                    {r.homeTeam.name}{" "}
-                    <span className="text-flood">
-                      {r.homeGoals}–{r.awayGoals}
-                    </span>{" "}
-                    {r.awayTeam.name}
-                  </span>
+                  {r.homeTeam.name}{" "}
+                  <span className="text-flood">
+                    {r.homeGoals}–{r.awayGoals}
+                  </span>{" "}
+                  {r.awayTeam.name}
                 </li>
               ))}
             </ul>
