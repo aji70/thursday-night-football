@@ -53,8 +53,9 @@ export function Hero() {
   const [newsChecked, setNewsChecked] = useState(false);
   const [results, setResults] = useState<ResultRow[]>([]);
   const [tickerIndex, setTickerIndex] = useState(0);
-  const nextFixture = findNextFixture();
-  const nextSession = findNextSession();
+  const playedKeys = new Set(results.map((r) => `${r.week}-${r.match}`));
+  const nextFixture = findNextFixture(new Date(), playedKeys);
+  const nextSession = findNextSession(new Date(), playedKeys);
 
   useEffect(() => {
     fetch("/api/auth/login")
@@ -370,7 +371,7 @@ export function Hero() {
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
               <p className="text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-flood">
-                Fixtures
+                {nextSession ? "Next matchday" : "Fixtures"}
               </p>
               <h2 className="font-display mt-1 text-2xl text-chalk sm:text-3xl">
                 {nextSession
@@ -387,7 +388,7 @@ export function Hero() {
           </div>
 
           {nextSession ? (
-            <ul className="mt-6 divide-y divide-line border border-line">
+            <ul className="mt-6 divide-y divide-line border border-flood/60 bg-flood/[0.06] shadow-[0_0_0_1px_rgba(0,0,0,0.2)]">
               {nextSession.fixtures.map((row) => {
                 const played = resultKey(nextSession.week, row.match);
                 return (
@@ -426,12 +427,26 @@ export function Hero() {
           <div className="mt-10">
             <h3 className="font-display text-xl text-chalk">All weeks</h3>
             <div className="mt-4 grid gap-6 md:grid-cols-2">
-              {([1, 2, 3, 4] as const).map((week) => (
-                <div key={week} className="border border-line">
-                  <div className="border-b border-flood/30 bg-black/20 px-4 py-2.5">
+              {([1, 2, 3, 4] as const).map((week) => {
+                const isNext = nextSession?.week === week;
+                return (
+                <div
+                  key={week}
+                  className={
+                    isNext
+                      ? "border border-flood/70 bg-flood/[0.06]"
+                      : "border border-line"
+                  }
+                >
+                  <div className="flex items-center justify-between gap-3 border-b border-flood/30 bg-black/20 px-4 py-2.5">
                     <p className="text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-flood">
                       Week {week} · {formatWeekDate(week)}
                     </p>
+                    {isNext ? (
+                      <span className="bg-flood px-2 py-0.5 text-[0.6rem] font-bold uppercase tracking-[0.12em] text-pitch-deep">
+                        Next up
+                      </span>
+                    ) : null}
                   </div>
                   <ul className="divide-y divide-line">
                     {fixturesByWeek[week].map((row) => {
@@ -455,7 +470,8 @@ export function Hero() {
                     })}
                   </ul>
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>

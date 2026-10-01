@@ -118,18 +118,24 @@ export type NextSessionInfo = {
   }[];
 };
 
-/** Next Thursday session in the cycle (calendar), with that night's fixtures. */
-export function findNextSession(today = new Date()): NextSessionInfo | null {
-  const startOfToday = new Date(
-    today.getFullYear(),
-    today.getMonth(),
-    today.getDate(),
-  );
+const SESSION_OVER_HOUR = 21;
 
+/**
+ * Next Thursday session in the cycle, with that night's fixtures. A night is
+ * skipped once it's past 9pm on the day or every fixture has a logged result.
+ */
+export function findNextSession(
+  today = new Date(),
+  playedKeys: Set<string> = new Set(),
+): NextSessionInfo | null {
   for (const week of [1, 2, 3, 4] as const) {
     const ymd = PAYMENT_CYCLE.weekDates[week];
-    const weekDate = parseYmd(ymd);
-    if (weekDate < startOfToday) continue;
+    const sessionOver = parseYmd(ymd);
+    sessionOver.setHours(SESSION_OVER_HOUR);
+    if (today >= sessionOver) continue;
+    if (fixturesByWeek[week].every((row) => playedKeys.has(`${week}-${row.match}`))) {
+      continue;
+    }
     return {
       week,
       date: ymd,
@@ -146,8 +152,11 @@ export function findNextSession(today = new Date()): NextSessionInfo | null {
 }
 
 /** Next single fixture (opening kick of the next matchday). */
-export function findNextFixture(today = new Date()) {
-  const session = findNextSession(today);
+export function findNextFixture(
+  today = new Date(),
+  playedKeys: Set<string> = new Set(),
+) {
+  const session = findNextSession(today, playedKeys);
   if (!session || session.fixtures.length === 0) return null;
   const row = session.fixtures[0];
   const kickoff = row.time.split("–")[0]?.trim() || row.time;

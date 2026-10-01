@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { SectionHeading } from "@/components/SectionHeading";
 import { fixturesByWeek, type Fixture } from "@/data/league";
 import { PAYMENT_CYCLE } from "@/lib/league-db";
+import { findNextSession } from "@/lib/next-match";
 
 const weeks = [1, 2, 3, 4] as const;
 
@@ -67,6 +68,21 @@ function FixtureRows({
 
 export function FixturesSection() {
   const [week, setWeek] = useState<(typeof weeks)[number]>(1);
+  const [nextWeek, setNextWeek] = useState<(typeof weeks)[number] | null>(null);
+
+  useEffect(() => {
+    fetch("/api/results")
+      .then((r) => (r.ok ? r.json() : { results: [] }))
+      .catch(() => ({ results: [] }))
+      .then((data: { results?: { week: number; match: number }[] }) => {
+        const played = new Set(
+          (data.results ?? []).map((r) => `${r.week}-${r.match}`),
+        );
+        const upcoming = findNextSession(new Date(), played)?.week ?? null;
+        setNextWeek(upcoming);
+        if (upcoming) setWeek(upcoming);
+      });
+  }, []);
 
   return (
     <section id="fixtures" className="border-t border-line py-16 sm:py-24">
@@ -98,6 +114,13 @@ export function FixturesSection() {
                 }`}
               >
                 Week {w}
+                {nextWeek === w ? (
+                  <span
+                    className={`ml-2 text-[0.65rem] ${active ? "text-pitch-deep" : "text-flood"}`}
+                  >
+                    · Next
+                  </span>
+                ) : null}
               </button>
             );
           })}
