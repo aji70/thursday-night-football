@@ -85,7 +85,14 @@ export function Hero() {
       .then(async ([nRes, rRes]) => {
         const nData = nRes.ok ? await nRes.json() : { posts: [] };
         const rData = rRes.ok ? await rRes.json() : { results: [] };
-        setPosts(nData.posts ?? []);
+        const allPosts: NewsPost[] = nData.posts ?? [];
+        const latestWeek = Math.max(
+          0,
+          ...allPosts.map((p) => p.week ?? 0),
+        );
+        setPosts(
+          allPosts.filter((p) => p.week === null || p.week === latestWeek),
+        );
         setResults(rData.results ?? []);
       })
       .catch(() => {})
