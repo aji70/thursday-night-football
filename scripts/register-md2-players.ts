@@ -75,7 +75,6 @@ async function main() {
 
   const shabi = await register("Shabi", 1);
   await register("Paul", 1);
-  await register("Woke", 3);
   await register("Gabriel", 4);
 
   const aliyu = byName("aliyu ahmad");
