@@ -59,7 +59,7 @@ const MATCHES: { match: number; home: number; away: number; events: MatchLine[] 
       ["Mayan", "GOAL", 1],
       ["Sani", "GOAL", 1],
       ["Vokay", "GOAL", 1],
-      ["Mayan", "ASSIST", 2],
+      ["Mayan", "ASSIST", 1],
       ["Amorah", "YC", 1],
     ],
   },
@@ -69,7 +69,7 @@ const MATCHES: { match: number; home: number; away: number; events: MatchLine[] 
     match: 4,
     home: 2,
     away: 1,
-    events: [["Aliyu", "GOAL", 2], ["Vokay", "GOAL", 1], ["Mayan", "ASSIST", 1]],
+    events: [["Aliyu", "GOAL", 2], ["Vokay", "GOAL", 1]],
   },
   {
     match: 5,
